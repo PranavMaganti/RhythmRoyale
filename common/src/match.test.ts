@@ -1,12 +1,25 @@
-import { GameOver, LobbyState, RoundResults, RoundStart, roundTiming } from "@rhythm-royale/common";
-import { eliminationCount, Match } from "./match";
-import { lastPayload, recordingTransport, SentEvent, TEST_CONFIG, testRng } from "./testing";
+import { describe, expect, test, vi } from "vitest";
+import {
+  type GameOver,
+  type LobbyState,
+  type RoundResults,
+  type RoundStart,
+  roundTiming,
+} from "./index.js";
+import { difficultyForRound, eliminationCount, Match, plannedRounds } from "./match.js";
+import {
+  lastPayload,
+  recordingTransport,
+  type SentEvent,
+  TEST_CONFIG,
+  testRng,
+} from "./testing.js";
 
-jest.useFakeTimers();
+vi.useFakeTimers();
 
 function setup(config = TEST_CONFIG) {
   const log: SentEvent[] = [];
-  const finished = jest.fn();
+  const finished = vi.fn();
   const match = new Match("m1", recordingTransport(log), finished, config, testRng());
   return { log, finished, match };
 }
@@ -28,6 +41,21 @@ describe("eliminationCount", () => {
   });
 });
 
+describe("difficulty ramp", () => {
+  test("rounds are planned from the lobby size", () => {
+    expect(plannedRounds(10, 0.3)).toBe(5);
+    expect(plannedRounds(6, 0.3)).toBe(4);
+    expect(plannedRounds(2, 0.3)).toBe(1);
+    expect(plannedRounds(1, 0.3)).toBe(0);
+  });
+
+  test("starts easy and the final round uses every pitch", () => {
+    expect([1, 2, 3, 4, 5].map((r) => difficultyForRound(r, 5))).toEqual([1, 2, 4, 5, 6]);
+    expect([1, 2, 3, 4].map((r) => difficultyForRound(r, 4))).toEqual([1, 3, 4, 6]);
+    expect(difficultyForRound(1, 1)).toBe(6);
+  });
+});
+
 describe("Match lobby", () => {
   test("announces players and a countdown", () => {
     const { log, match } = setup();
@@ -41,7 +69,7 @@ describe("Match lobby", () => {
   test("fills empty seats with bots when the timer runs out", () => {
     const { log, match } = setup();
     match.addHuman("a", "Alice");
-    jest.advanceTimersByTime(TEST_CONFIG.lobbyWaitMs);
+    vi.advanceTimersByTime(TEST_CONFIG.lobbyWaitMs);
     const round = lastPayload<RoundStart>(log, "round_start");
     expect(round.round).toBe(1);
     expect(round.playerCount).toBe(6);
@@ -63,7 +91,7 @@ describe("Match lobby", () => {
     match.addHuman("a", "Alice");
     match.removeHuman("a");
     expect(finished).toHaveBeenCalledWith(match);
-    jest.advanceTimersByTime(TEST_CONFIG.lobbyWaitMs);
+    vi.advanceTimersByTime(TEST_CONFIG.lobbyWaitMs);
     expect(match.phase).toBe("finished");
   });
 });
@@ -72,7 +100,7 @@ describe("Match rounds", () => {
   test("a perfect player wins against bots", () => {
     const { log, match, finished } = setup();
     match.addHuman("a", "Alice");
-    jest.advanceTimersByTime(TEST_CONFIG.lobbyWaitMs);
+    vi.advanceTimersByTime(TEST_CONFIG.lobbyWaitMs);
 
     let rounds = 0;
     while (match.phase !== "finished" && rounds < 20) {
@@ -80,21 +108,24 @@ describe("Match rounds", () => {
       const results = lastPayload<RoundResults>(log, "round_results");
       expect(results.round).toBe(++rounds);
       expect(results.results.find((r) => r.id === "a")?.eliminated).toBe(false);
-      jest.advanceTimersByTime(TEST_CONFIG.resultsMs);
+      vi.advanceTimersByTime(TEST_CONFIG.resultsMs);
     }
 
     const over = lastPayload<GameOver>(log, "game_over");
     expect(over.winner.id).toBe("a");
     expect(over.standings.map((p) => p.placement)).toEqual([1, 2, 3, 4, 5, 6]);
     expect(finished).toHaveBeenCalled();
-    // 6 -> 4 -> 3 -> 2 -> 1
+    // 6 -> 4 -> 3 -> 2 -> 1, ending on the six-pitch level.
     expect(rounds).toBe(4);
+    const starts = log.filter((e) => e.event === "round_start").map((e) => e.payload as RoundStart);
+    expect(starts.map((r) => r.totalRounds)).toEqual([4, 4, 4, 4]);
+    expect(starts[3].rhythm.pitches).toBe(6);
   });
 
   test("results are sorted and eliminate the bottom of the field", () => {
     const { log, match } = setup();
     match.addHuman("a", "Alice");
-    jest.advanceTimersByTime(TEST_CONFIG.lobbyWaitMs);
+    vi.advanceTimersByTime(TEST_CONFIG.lobbyWaitMs);
     playPerfectly(match, log, "a");
     const { results, nextRoundInMs } = lastPayload<RoundResults>(log, "round_results");
     expect(results).toHaveLength(6);
@@ -109,9 +140,9 @@ describe("Match rounds", () => {
   test("a player who doesn't submit scores zero when time runs out", () => {
     const { log, match } = setup();
     match.addHuman("a", "Alice");
-    jest.advanceTimersByTime(TEST_CONFIG.lobbyWaitMs);
+    vi.advanceTimersByTime(TEST_CONFIG.lobbyWaitMs);
     const round = lastPayload<RoundStart>(log, "round_start");
-    jest.advanceTimersByTime(roundTiming(round.rhythm).totalMs + TEST_CONFIG.graceMs);
+    vi.advanceTimersByTime(roundTiming(round.rhythm).totalMs + TEST_CONFIG.graceMs);
     const { results } = lastPayload<RoundResults>(log, "round_results");
     const alice = results.find((r) => r.id === "a");
     expect(alice?.score).toBe(0);
@@ -121,7 +152,7 @@ describe("Match rounds", () => {
   test("once every human is out the bots are settled instantly", () => {
     const { log, match, finished } = setup();
     match.addHuman("a", "Alice");
-    jest.advanceTimersByTime(TEST_CONFIG.lobbyWaitMs);
+    vi.advanceTimersByTime(TEST_CONFIG.lobbyWaitMs);
     match.submit("a", 1, []);
     const results = lastPayload<RoundResults>(log, "round_results");
     expect(results.nextRoundInMs).toBe(0);
@@ -135,7 +166,7 @@ describe("Match rounds", () => {
     const { log, match } = setup();
     match.addHuman("a", "Alice");
     match.addHuman("b", "Bob");
-    jest.advanceTimersByTime(TEST_CONFIG.lobbyWaitMs);
+    vi.advanceTimersByTime(TEST_CONFIG.lobbyWaitMs);
     match.submit("a", 99, []);
     match.submit("stranger", 1, []);
     match.submit("bot-m1-0", 1, []);
@@ -152,7 +183,7 @@ describe("Match rounds", () => {
     const { log, match } = setup();
     match.addHuman("a", "Alice");
     match.addHuman("b", "Bob");
-    jest.advanceTimersByTime(TEST_CONFIG.lobbyWaitMs);
+    vi.advanceTimersByTime(TEST_CONFIG.lobbyWaitMs);
     playPerfectly(match, log, "a");
     expect(match.phase).toBe("round");
     playPerfectly(match, log, "b");
@@ -163,7 +194,7 @@ describe("Match rounds", () => {
     const { log, match } = setup();
     match.addHuman("a", "Alice");
     match.addHuman("b", "Bob");
-    jest.advanceTimersByTime(TEST_CONFIG.lobbyWaitMs);
+    vi.advanceTimersByTime(TEST_CONFIG.lobbyWaitMs);
     playPerfectly(match, log, "a");
     match.removeHuman("b");
     expect(match.players.get("b")?.placement).toBe(6);
@@ -176,13 +207,13 @@ describe("Match rounds", () => {
     const { log, match } = setup();
     match.addHuman("a", "Alice");
     match.addHuman("b", "Bob");
-    jest.advanceTimersByTime(TEST_CONFIG.lobbyWaitMs);
+    vi.advanceTimersByTime(TEST_CONFIG.lobbyWaitMs);
     playPerfectly(match, log, "a");
     match.submit("b", 1, []);
     const results = lastPayload<RoundResults>(log, "round_results");
     expect(results.results.find((r) => r.id === "b")?.eliminated).toBe(true);
     expect(results.nextRoundInMs).toBe(TEST_CONFIG.resultsMs);
-    jest.advanceTimersByTime(TEST_CONFIG.resultsMs);
+    vi.advanceTimersByTime(TEST_CONFIG.resultsMs);
     expect(lastPayload<RoundStart>(log, "round_start").round).toBe(2);
   });
 });

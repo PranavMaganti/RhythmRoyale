@@ -1,14 +1,14 @@
-import { Note } from "@rhythm-royale/common";
-import { useCallback, useEffect, useRef, useState } from "react";
-
-const KEYS = new Set([" ", "Enter"]);
+import type { Note } from "@rhythm-royale/common";
+import { type PointerEvent, useCallback, useEffect, useRef, useState } from "react";
+import { laneForKey } from "../lib/keys";
 
 interface Options {
   enabled: boolean;
+  pitches: number;
   /** Ignore presses that begin this long before the origin (e.g. tapping along to the count-in). */
   earlyToleranceMs: number;
-  onPress?: () => void;
-  onRelease?: () => void;
+  onPress?: (lane: number) => void;
+  onRelease?: (lane: number) => void;
 }
 
 /**
@@ -16,87 +16,110 @@ interface Options {
  * performance.now() timestamp). Uses refs for the recording itself so the
  * final result never depends on a stale render.
  */
-export function useTapRecorder({ enabled, earlyToleranceMs, onPress, onRelease }: Options) {
+export function useTapRecorder({
+  enabled,
+  pitches,
+  earlyToleranceMs,
+  onPress,
+  onRelease,
+}: Options) {
   const [notes, setNotes] = useState<Note[]>([]);
-  const [isDown, setIsDown] = useState(false);
+  const [held, setHeld] = useState<ReadonlySet<number>>(new Set());
   const originRef = useRef(0);
-  const downAtRef = useRef<number | null>(null);
+  const downAtRef = useRef(new Map<number, number>());
   const notesRef = useRef<Note[]>([]);
   const callbacks = useRef({ onPress, onRelease });
   callbacks.current = { onPress, onRelease };
 
-  const press = useCallback(() => {
-    if (downAtRef.current !== null) return;
-    downAtRef.current = performance.now();
-    setIsDown(true);
-    callbacks.current.onPress?.();
-  }, []);
+  const syncHeld = useCallback(() => setHeld(new Set(downAtRef.current.keys())), []);
 
-  const release = useCallback(() => {
-    const downAt = downAtRef.current;
-    if (downAt === null) return;
-    downAtRef.current = null;
-    setIsDown(false);
-    callbacks.current.onRelease?.();
-    const start = downAt - originRef.current;
-    if (start < -earlyToleranceMs) return;
-    notesRef.current = [...notesRef.current, { start, duration: performance.now() - downAt }];
-    setNotes(notesRef.current);
-  }, [earlyToleranceMs]);
+  const press = useCallback(
+    (lane: number) => {
+      if (downAtRef.current.has(lane)) return;
+      downAtRef.current.set(lane, performance.now());
+      syncHeld();
+      callbacks.current.onPress?.(lane);
+    },
+    [syncHeld],
+  );
+
+  const release = useCallback(
+    (lane: number) => {
+      const downAt = downAtRef.current.get(lane);
+      if (downAt === undefined) return;
+      downAtRef.current.delete(lane);
+      syncHeld();
+      callbacks.current.onRelease?.(lane);
+      const start = downAt - originRef.current;
+      if (start < -earlyToleranceMs) return;
+      notesRef.current = [
+        ...notesRef.current,
+        { start, duration: performance.now() - downAt, pitch: lane },
+      ];
+      setNotes(notesRef.current);
+    },
+    [earlyToleranceMs, syncHeld],
+  );
+
+  const releaseAll = useCallback(() => {
+    for (const lane of Array.from(downAtRef.current.keys())) release(lane);
+  }, [release]);
 
   /** Start a fresh recording whose time zero is `origin`. */
   const arm = useCallback((origin: number) => {
     originRef.current = origin;
-    downAtRef.current = null;
+    downAtRef.current.clear();
     notesRef.current = [];
     setNotes([]);
-    setIsDown(false);
+    setHeld(new Set());
   }, []);
 
   /** Stop recording, closing any note that is still held. */
   const finish = useCallback((): Note[] => {
-    release();
-    return notesRef.current;
-  }, [release]);
+    releaseAll();
+    return [...notesRef.current].sort((a, b) => a.start - b.start);
+  }, [releaseAll]);
 
   useEffect(() => {
     if (!enabled) {
-      release();
+      releaseAll();
       return;
     }
     const down = (e: KeyboardEvent) => {
-      if (!KEYS.has(e.key)) return;
+      const lane = laneForKey(e.key, pitches);
+      if (lane === null) return;
       e.preventDefault();
-      if (!e.repeat) press();
+      if (!e.repeat) press(lane);
     };
     const up = (e: KeyboardEvent) => {
-      if (!KEYS.has(e.key)) return;
+      const lane = laneForKey(e.key, pitches);
+      if (lane === null) return;
       e.preventDefault();
-      release();
+      release(lane);
     };
     // Releasing outside the window (alt-tab) must not leave a note stuck on.
-    const blur = () => release();
     window.addEventListener("keydown", down);
     window.addEventListener("keyup", up);
-    window.addEventListener("blur", blur);
+    window.addEventListener("blur", releaseAll);
     return () => {
       window.removeEventListener("keydown", down);
       window.removeEventListener("keyup", up);
-      window.removeEventListener("blur", blur);
+      window.removeEventListener("blur", releaseAll);
     };
-  }, [enabled, press, release]);
+  }, [enabled, pitches, press, release, releaseAll]);
 
-  const padHandlers = {
-    onPointerDown: (e: React.PointerEvent<HTMLElement>) => {
+  /** Props for the on-screen pad of `lane` (touch and mouse). */
+  const padHandlers = (lane: number) => ({
+    onPointerDown: (e: PointerEvent<HTMLElement>) => {
       if (!enabled) return;
       e.preventDefault();
       e.currentTarget.setPointerCapture?.(e.pointerId);
-      press();
+      press(lane);
     },
-    onPointerUp: () => release(),
-    onPointerCancel: () => release(),
-    onContextMenu: (e: React.MouseEvent) => e.preventDefault(),
-  };
+    onPointerUp: () => release(lane),
+    onPointerCancel: () => release(lane),
+    onContextMenu: (e: { preventDefault(): void }) => e.preventDefault(),
+  });
 
-  return { notes, isDown, arm, finish, padHandlers };
+  return { notes, held, arm, finish, padHandlers };
 }

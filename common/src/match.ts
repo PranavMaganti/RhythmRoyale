@@ -1,18 +1,9 @@
-import {
-  generateRhythm,
-  MAX_DIFFICULTY,
-  Note,
-  PlayerInfo,
-  Rhythm,
-  RoundResultEntry,
-  roundTiming,
-  Rng,
-  sanitizeNotes,
-  scoreAttempt,
-  ServerToClientEvents,
-  simulateAttempt,
-} from "@rhythm-royale/common";
-import { botName, botSkills, SkillDistribution } from "./bots";
+import { botName, botSkills, type SkillDistribution } from "./botNames.js";
+import { simulateAttempt } from "./bots.js";
+import type { PlayerInfo, RoundResultEntry, ServerToClientEvents } from "./protocol.js";
+import type { Rng } from "./random.js";
+import { generateRhythm, MAX_DIFFICULTY, type Note, type Rhythm, roundTiming } from "./rhythm.js";
+import { sanitizeNotes, scoreAttempt } from "./scoring.js";
 
 export interface MatchConfig {
   maxPlayers: number;
@@ -52,6 +43,23 @@ interface Player extends PlayerInfo {
 
 export type MatchPhase = "lobby" | "round" | "results" | "finished";
 
+/** How many rounds a match with this many players will take. */
+export function plannedRounds(players: number, rate: number): number {
+  let rounds = 0;
+  for (let alive = players; alive > 1; alive -= eliminationCount(alive, rate)) rounds++;
+  return rounds;
+}
+
+/**
+ * Spread the difficulty levels across the match so the opening round is
+ * gentle and the final round always uses every pitch.
+ */
+export function difficultyForRound(round: number, totalRounds: number): number {
+  if (totalRounds <= 1) return MAX_DIFFICULTY;
+  const level = 1 + ((round - 1) * (MAX_DIFFICULTY - 1)) / (totalRounds - 1);
+  return Math.min(MAX_DIFFICULTY, Math.max(1, Math.round(level)));
+}
+
 export function eliminationCount(alive: number, rate: number): number {
   if (alive <= 1) return 0;
   if (alive === 2) return 1;
@@ -62,6 +70,7 @@ export class Match {
   readonly players = new Map<string, Player>();
   phase: MatchPhase = "lobby";
   round = 0;
+  totalRounds = 0;
   private rhythm?: Rhythm;
   private timer?: ReturnType<typeof setTimeout>;
   private readonly startsAt: number;
@@ -72,7 +81,7 @@ export class Match {
     private readonly onFinished: (match: Match) => void,
     private readonly config: MatchConfig = DEFAULT_MATCH_CONFIG,
     private readonly rng: Rng = Math.random,
-    private readonly now: () => number = Date.now
+    private readonly now: () => number = Date.now,
   ) {
     this.startsAt = now() + config.lobbyWaitMs;
     this.timer = setTimeout(() => this.start(), config.lobbyWaitMs);
@@ -146,6 +155,8 @@ export class Match {
       const id = `bot-${this.id}-${i}`;
       this.players.set(id, { id, name, isBot: true, alive: true, connected: true, skill });
     });
+    // Leavers only shorten a match, so this plan is an upper bound.
+    this.totalRounds = plannedRounds(this.players.size, this.config.eliminationRate);
     this.startRound();
   }
 
@@ -156,10 +167,10 @@ export class Match {
       return;
     }
     this.round++;
-    const difficulty = Math.min(this.round, MAX_DIFFICULTY);
+    const difficulty = difficultyForRound(this.round, this.totalRounds);
     const rhythm = generateRhythm(difficulty, this.rng);
     this.rhythm = rhythm;
-    this.players.forEach((p) => (p.attempt = undefined));
+    for (const p of this.players.values()) p.attempt = undefined;
     this.phase = "round";
     this.transport.broadcast("round_start", {
       round: this.round,
@@ -167,6 +178,7 @@ export class Match {
       rhythm,
       aliveCount: alive.length,
       playerCount: this.players.size,
+      totalRounds: this.totalRounds,
     });
     const { totalMs } = roundTiming(rhythm);
     this.timer = setTimeout(() => this.finalizeRound(), totalMs + this.config.graceMs);
@@ -230,7 +242,7 @@ export class Match {
       .map((player) => {
         const attempt = player.isBot
           ? simulateAttempt(rhythm, player.skill, this.rng)
-          : player.attempt ?? [];
+          : (player.attempt ?? []);
         return { player, score: scoreAttempt(rhythm, attempt).score, tiebreak: this.rng() };
       })
       .sort((a, b) => b.score - a.score || a.tiebreak - b.tiebreak);
@@ -240,7 +252,7 @@ export class Match {
     let round = this.round;
     while (this.alive().length > 1) {
       round++;
-      const rhythm = generateRhythm(Math.min(round, MAX_DIFFICULTY), this.rng);
+      const rhythm = generateRhythm(difficultyForRound(round, this.totalRounds), this.rng);
       const ranked = this.playRound(rhythm, this.alive());
       const eliminated = eliminationCount(ranked.length, this.config.eliminationRate);
       ranked.slice(ranked.length - eliminated).forEach(({ player }, i) => {
@@ -257,7 +269,7 @@ export class Match {
     const alive = this.alive();
     if (alive.length === 1) alive[0].placement = 1;
     const standings = Array.from(this.players.values(), (p) => this.info(p)).sort(
-      (a, b) => (a.placement ?? Infinity) - (b.placement ?? Infinity)
+      (a, b) => (a.placement ?? Infinity) - (b.placement ?? Infinity),
     );
     if (standings.length > 0) {
       this.transport.broadcast("game_over", { winner: standings[0], standings });

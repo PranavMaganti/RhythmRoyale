@@ -1,22 +1,23 @@
+import fs from "node:fs";
+import http from "node:http";
+import path from "node:path";
 import {
-  ClientToServerEvents,
+  type ClientToServerEvents,
+  DEFAULT_MATCH_CONFIG,
   dailyKey,
   isDailyKey,
-  ServerToClientEvents,
+  type MatchConfig,
+  type ServerToClientEvents,
 } from "@rhythm-royale/common";
 import cors from "cors";
 import express from "express";
-import fs from "fs";
-import http from "http";
-import path from "path";
 import { Server } from "socket.io";
-import { DailyBoard } from "./daily";
-import { DEFAULT_MATCH_CONFIG, MatchConfig } from "./match";
-import { Matchmaker } from "./matchmaker";
-import { sanitizeName } from "./names";
+import { DailyBoard } from "./daily.js";
+import { Matchmaker } from "./matchmaker.js";
+import { sanitizeName } from "./names.js";
 
 const PORT = Number(process.env.PORT) || 5000;
-const FRONTEND_BUILD = path.resolve(__dirname, "../../frontend/build");
+const FRONTEND_BUILD = path.resolve(import.meta.dirname, "../../frontend/dist");
 
 function envNumber(name: string, fallback: number): number {
   const value = Number(process.env[name]);
@@ -51,7 +52,7 @@ const matchmaker = new Matchmaker(
     joinRoom: (playerId, matchId) => io.sockets.sockets.get(playerId)?.join(matchId),
     leaveRoom: (playerId, matchId) => io.sockets.sockets.get(playerId)?.leave(matchId),
   },
-  matchConfig
+  matchConfig,
 );
 
 const daily = new DailyBoard();
@@ -85,8 +86,8 @@ app.post("/api/daily", (req, res) => {
 // Serve the React app in production; client-side routes fall back to index.html.
 if (fs.existsSync(FRONTEND_BUILD)) {
   app.use(express.static(FRONTEND_BUILD));
-  app.get("*", (req, res, next) => {
-    if (req.path.startsWith("/api/") || req.path.startsWith("/socket.io/")) return next();
+  app.use((req, res, next) => {
+    if (req.method !== "GET" || req.path.startsWith("/api/")) return next();
     res.sendFile(path.join(FRONTEND_BUILD, "index.html"));
   });
 }

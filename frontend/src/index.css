@@ -21,10 +21,12 @@
 html,
 body {
   margin: 0;
-  background: radial-gradient(ellipse at top, #1b1740 0%, var(--bg) 60%) fixed, var(--bg);
+  background:
+    radial-gradient(ellipse at top, #1b1740 0%, var(--bg) 60%) fixed,
+    var(--bg);
   color: var(--text);
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial,
-    sans-serif;
+  font-family:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
   min-height: 100%;
 }
@@ -114,10 +116,6 @@ kbd {
   border-radius: var(--radius);
   padding: 1.75rem 1.5rem;
 }
-.card .field {
-  text-align: left;
-  margin: 1rem 0;
-}
 
 /* Controls */
 .field {
@@ -135,6 +133,10 @@ kbd {
   border: 1px solid var(--border);
   border-radius: 10px;
   padding: 0.7rem 0.9rem;
+}
+.card .field {
+  text-align: left;
+  margin: 1rem 0;
 }
 .field input:focus {
   outline: 2px solid var(--accent-2);
@@ -172,7 +174,17 @@ kbd {
   outline: 2px solid var(--accent-2);
   outline-offset: 2px;
 }
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
 .chips {
+  border: 0;
+  padding: 0;
   display: flex;
   gap: 0.5rem;
   justify-content: center;
@@ -202,6 +214,17 @@ kbd {
 .banner--error {
   background: rgba(255, 90, 90, 0.15);
   border: 1px solid var(--bad);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+  align-items: center;
+  justify-content: space-between;
+}
+.btn--small {
+  padding: 0.4rem 0.9rem;
+  font-size: 0.9rem;
+  background: var(--text);
+  color: var(--bg);
 }
 .tag {
   font-size: 0.7rem;
@@ -255,15 +278,17 @@ kbd {
   display: flex;
   flex-direction: column;
   gap: 0.25rem;
-  transition: transform 0.1s ease, border-color 0.1s ease;
+  transition:
+    transform 0.1s ease,
+    border-color 0.1s ease;
 }
 .mode:hover {
   transform: translateY(-2px);
   border-color: var(--accent-2);
 }
 .mode--primary {
-  background: linear-gradient(135deg, rgba(255, 79, 163, 0.25), rgba(94, 231, 255, 0.12)),
-    var(--bg-raised);
+  background:
+    linear-gradient(135deg, rgba(255, 79, 163, 0.25), rgba(94, 231, 255, 0.12)), var(--bg-raised);
   border-color: var(--accent);
 }
 .mode-title {
@@ -344,40 +369,78 @@ kbd {
 .round-hint {
   min-height: 3em;
 }
+.pads {
+  display: flex;
+  justify-content: center;
+  gap: clamp(6px, 2vw, 12px);
+  margin: 0.5rem auto 1rem;
+  touch-action: none;
+}
 .pad {
+  --lane: var(--accent);
   display: grid;
   place-items: center;
-  width: min(62vw, 240px);
-  aspect-ratio: 1;
-  margin: 0.5rem auto 1.5rem;
-  border-radius: 50%;
-  border: 3px solid var(--border);
-  background: radial-gradient(circle at 35% 30%, #2a2f52, var(--bg-sunken));
+  flex: 1 1 0;
+  max-width: 88px;
+  height: 150px;
+  border-radius: 16px;
+  border: 3px solid color-mix(in srgb, var(--lane) 45%, var(--border));
+  background: linear-gradient(180deg, #232845, var(--bg-sunken));
   color: var(--text);
   touch-action: none;
   cursor: pointer;
-  transition: transform 0.05s ease, box-shadow 0.08s ease, border-color 0.08s ease;
+  transition:
+    transform 0.05s ease,
+    box-shadow 0.08s ease,
+    background 0.08s ease;
   -webkit-tap-highlight-color: transparent;
+  user-select: none;
 }
-.pad--listen.pad--on {
-  border-color: var(--accent-2);
-  box-shadow: 0 0 48px rgba(94, 231, 255, 0.55);
-  background: radial-gradient(circle at 35% 30%, #5ee7ff, #1c6c80);
+.pads--1 .pad {
+  flex: none;
+  max-width: none;
+  width: min(62vw, 240px);
+  height: auto;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  margin-bottom: 0.5rem;
+  background: radial-gradient(circle at 35% 30%, #2a2f52, var(--bg-sunken));
 }
-.pad--prepare,
-.pad--record {
-  border-color: var(--accent);
-}
-.pad--record.pad--on,
-.pad--prepare.pad--on {
+.pad--on {
   transform: scale(0.96);
-  box-shadow: 0 0 48px rgba(255, 79, 163, 0.6);
-  background: radial-gradient(circle at 35% 30%, #ff8cc6, #8a1f55);
+  border-color: var(--lane);
+  box-shadow: 0 0 36px color-mix(in srgb, var(--lane) 70%, transparent);
+  background: radial-gradient(
+    circle at 50% 35%,
+    color-mix(in srgb, var(--lane) 85%, white),
+    color-mix(in srgb, var(--lane) 45%, black)
+  );
+}
+.pads--1 .pad--listen.pad--on,
+.pads--1 .pad--preview.pad--on {
+  --lane: var(--accent-2);
 }
 .pad-count {
   font-size: 4rem;
   font-weight: 900;
   pointer-events: none;
+}
+.pad-key {
+  font-weight: 800;
+  font-size: 1rem;
+  pointer-events: none;
+  align-self: end;
+  margin-bottom: 0.75rem;
+  color: var(--muted);
+}
+.pad--on .pad-key {
+  color: #0e0f1a;
+}
+.count-line {
+  font-size: 2rem;
+  font-weight: 900;
+  min-height: 2.5rem;
+  margin: 0;
 }
 
 /* Rhythm lanes */
@@ -429,6 +492,15 @@ kbd {
 .lane-note--bad {
   background: var(--bad);
 }
+.lane-note--wrongKey {
+  background: repeating-linear-gradient(
+    135deg,
+    var(--ok),
+    var(--ok) 4px,
+    var(--bad) 4px,
+    var(--bad) 8px
+  );
+}
 .lane-note--missed {
   background: transparent;
   border: 2px dashed var(--bad);
@@ -475,8 +547,18 @@ kbd {
 }
 .result-banner--win {
   border-color: var(--ok);
-  background: linear-gradient(135deg, rgba(255, 197, 61, 0.2), rgba(255, 79, 163, 0.15)),
-    var(--bg-raised);
+  background:
+    linear-gradient(135deg, rgba(255, 197, 61, 0.2), rgba(255, 79, 163, 0.15)), var(--bg-raised);
+}
+.share-text {
+  font: inherit;
+  width: 100%;
+  color: var(--text);
+  background: var(--bg-sunken);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0.6rem 0.8rem;
+  resize: none;
 }
 .emoji-row {
   font-size: 1.6rem;

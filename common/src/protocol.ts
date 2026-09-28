@@ -1,4 +1,4 @@
-import { Note, Rhythm } from "./rhythm";
+import type { Note, Rhythm } from "./rhythm.js";
 
 /** Socket.IO event contracts shared by the server and the browser. */
 
@@ -25,6 +25,8 @@ export interface RoundStart {
   rhythm: Rhythm;
   aliveCount: number;
   playerCount: number;
+  /** Rounds the match is planned to last (the last one uses every pitch). */
+  totalRounds: number;
 }
 
 export interface RoundResultEntry {

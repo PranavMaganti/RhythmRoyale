@@ -1,25 +1,16 @@
-import {
-  ClientToServerEvents,
-  GameOver,
-  LobbyState,
-  Note,
-  RoundResults,
-  RoundStart,
-  ServerToClientEvents,
-} from "@rhythm-royale/common";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Link } from "react-router-dom";
-import { io, Socket } from "socket.io-client";
+import type { GameOver, LobbyState, Note, RoundResults, RoundStart } from "@rhythm-royale/common";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Link } from "react-router";
 import { useSecondsLeft } from "../components/Countdown";
 import RhythmCompare from "../components/RhythmCompare";
 import RoundPlayer from "../components/RoundPlayer";
 import Shell from "../components/Shell";
-import { backendUrl } from "../config";
+import { OFFLINE } from "../config";
 import { audioReady, unlockAudio } from "../lib/audio";
+import { type GameConnection, localConnection, socketConnection } from "../lib/connection";
 import { loadName, saveName } from "../lib/storage";
 
 type View = "join" | "connecting" | "lobby" | "playing" | "waiting" | "results" | "spectating";
-type GameSocket = Socket<ServerToClientEvents, ClientToServerEvents>;
 
 function ordinal(n: number): string {
   const s = ["th", "st", "nd", "rd"];
@@ -28,9 +19,8 @@ function ordinal(n: number): string {
 }
 
 export default function Royale() {
-  const socket: GameSocket = useMemo(
-    () => (backendUrl ? io(backendUrl, { autoConnect: false }) : io({ autoConnect: false })),
-    []
+  const [conn, setConn] = useState<GameConnection>(() =>
+    OFFLINE ? localConnection() : socketConnection(),
   );
   const [name, setName] = useState(loadName());
   const [view, setView] = useState<View>("join");
@@ -45,25 +35,43 @@ export default function Royale() {
   const attempts = useRef<Record<number, Note[]>>({});
   const idRef = useRef<string | null>(null);
   const outRef = useRef(false);
+  const nameRef = useRef(name);
+  nameRef.current = name;
+  /** Set when switching to offline play, so the new connection queues straight away. */
+  const queueOnConnect = useRef(false);
+
+  const reset = useCallback(() => {
+    attempts.current = {};
+    outRef.current = false;
+    setOut(false);
+    setGameOver(null);
+    setResults(null);
+    setRound(null);
+    setLobby(null);
+    setError(null);
+    setView("connecting");
+  }, []);
 
   useEffect(() => {
-    socket.on("connect_error", () => setError("Can't reach the game server. Retrying…"));
-    socket.on("connect", () => setError(null));
-    socket.on("welcome", ({ playerId }) => {
+    conn.onError((message) => {
+      setError(message);
+      if (message) setView((v) => (v === "connecting" ? v : "join"));
+    });
+    conn.on("welcome", ({ playerId }) => {
       idRef.current = playerId;
       setPlayerId(playerId);
     });
-    socket.on("lobby", (state) => {
+    conn.on("lobby", (state) => {
       setLobby({ state, startsAt: Date.now() + state.startsInMs });
       setView("lobby");
     });
-    socket.on("round_start", (r) => {
+    conn.on("round_start", (r) => {
       setRound(r);
       setProgress(null);
       setView(outRef.current ? "spectating" : "playing");
     });
-    socket.on("submissions", setProgress);
-    socket.on("round_results", (data) => {
+    conn.on("submissions", setProgress);
+    conn.on("round_results", (data) => {
       setResults({ data, nextAt: Date.now() + data.nextRoundInMs });
       const me = data.results.find((r) => r.id === idRef.current);
       if (me?.eliminated) {
@@ -72,33 +80,28 @@ export default function Royale() {
       }
       setView("results");
     });
-    socket.on("game_over", setGameOver);
-    socket.on("disconnect", (reason) => {
-      if (reason !== "io client disconnect") {
-        setError("Lost connection to the game server.");
-        setView("join");
-      }
-    });
-    return () => {
-      socket.removeAllListeners();
-      socket.disconnect();
-    };
-  }, [socket]);
+    conn.on("game_over", setGameOver);
+    if (queueOnConnect.current) {
+      queueOnConnect.current = false;
+      conn.queue(nameRef.current);
+    }
+    return () => conn.close();
+  }, [conn]);
 
   const join = useCallback(async () => {
     saveName(name);
     await unlockAudio().catch(() => undefined);
-    attempts.current = {};
-    outRef.current = false;
-    setOut(false);
-    setGameOver(null);
-    setResults(null);
-    setRound(null);
-    setLobby(null);
-    setView("connecting");
-    if (!socket.connected) socket.connect();
-    socket.emit("queue", name);
-  }, [name, socket]);
+    reset();
+    conn.queue(name);
+  }, [conn, name, reset]);
+
+  const playOffline = useCallback(async () => {
+    saveName(name);
+    await unlockAudio().catch(() => undefined);
+    reset();
+    queueOnConnect.current = true;
+    setConn(localConnection());
+  }, [name, reset]);
 
   // Coming from the home screen the audio is already unlocked, so skip straight in.
   const autoJoined = useRef(false);
@@ -113,16 +116,23 @@ export default function Royale() {
     (notes: Note[]) => {
       if (!round) return;
       attempts.current[round.round] = notes;
-      socket.emit("submit", { round: round.round, notes });
+      conn.submit({ round: round.round, notes });
       setView("waiting");
     },
-    [round, socket]
+    [round, conn],
   );
 
   const lobbySeconds = useSecondsLeft(view === "lobby" && lobby ? lobby.startsAt : null);
   const nextSeconds = useSecondsLeft(results && view === "results" ? results.nextAt : null);
 
-  const errorBanner = error && <div className="banner banner--error">{error}</div>;
+  const errorBanner = error && (
+    <div className="banner banner--error">
+      <span>{error}</span>
+      <button type="button" className="btn btn--small" onClick={playOffline}>
+        Play offline against bots
+      </button>
+    </div>
+  );
 
   if (view === "join") {
     return (
@@ -131,8 +141,9 @@ export default function Royale() {
         <section className="card center">
           <h1>Battle Royale</h1>
           <p className="muted">
-            Join a lobby. When it fills up, or after a short wait, bots take the empty seats and the
-            first rhythm plays.
+            {conn.offline
+              ? "You against nine bots, right here in your browser. Each round adds a note to choose from; the final round uses six."
+              : "Join a lobby. When it fills up, or after a short wait, bots take the empty seats and the first melody plays. Each round adds a note to choose from; the final round uses six."}
           </p>
           <form
             className="stack"
@@ -143,15 +154,10 @@ export default function Royale() {
           >
             <label className="field">
               <span>Nickname</span>
-              <input
-                value={name}
-                maxLength={16}
-                onChange={(e) => setName(e.target.value)}
-                autoFocus
-              />
+              <input value={name} maxLength={16} onChange={(e) => setName(e.target.value)} />
             </label>
             <button className="btn btn--primary" type="submit">
-              Find a match
+              {conn.offline ? "Start" : "Find a match"}
             </button>
           </form>
         </section>
@@ -192,23 +198,32 @@ export default function Royale() {
               </li>
             ))}
             {Array.from({ length: empty }, (_, i) => (
+              // biome-ignore lint/suspicious/noArrayIndexKey: empty seats are interchangeable
               <li key={`empty-${i}`} className="seat seat--empty">
                 Waiting…
               </li>
             ))}
           </ul>
-          <button
-            className="btn btn--ghost"
-            onClick={() => navigator.clipboard?.writeText(`${window.location.origin}/royale`)}
-          >
-            Copy invite link
-          </button>
+          {!conn.offline && (
+            <button
+              type="button"
+              className="btn btn--ghost"
+              onClick={() => navigator.clipboard?.writeText(`${window.location.origin}/royale`)}
+            >
+              Copy invite link
+            </button>
+          )}
         </section>
       </Shell>
     );
   }
 
   const aliveLabel = round && `${round.aliveCount} of ${round.playerCount} left`;
+  const roundLabel =
+    round &&
+    (round.round === round.totalRounds
+      ? "Final round"
+      : `Round ${round.round} of ${round.totalRounds}`);
 
   if (view === "playing" && round) {
     return (
@@ -220,7 +235,7 @@ export default function Royale() {
           onComplete={onRoundComplete}
           heading={
             <>
-              Round {round.round} · <span className="muted">{aliveLabel}</span>
+              {roundLabel} · <span className="muted">{aliveLabel}</span>
             </>
           }
         />
@@ -233,7 +248,7 @@ export default function Royale() {
       <Shell>
         {errorBanner}
         <section className="card center">
-          <h2>{view === "waiting" ? "Scoring…" : `Round ${round?.round} in progress`}</h2>
+          <h2>{view === "waiting" ? "Scoring…" : `${roundLabel} in progress`}</h2>
           <p className="muted pulse">
             {view === "waiting"
               ? progress && progress.waitingFor > 0
@@ -244,7 +259,7 @@ export default function Royale() {
               : `You're spectating. ${aliveLabel}.`}
           </p>
           {view === "spectating" && (
-            <button className="btn btn--primary" onClick={join}>
+            <button type="button" className="btn btn--primary" onClick={join}>
               Play again
             </button>
           )}
@@ -330,7 +345,7 @@ export default function Royale() {
           {!gameOver && !out && <p className="muted">Next round in {nextSeconds}s…</p>}
           {!gameOver && out && <p className="muted">You can keep watching or start a new match.</p>}
           {(gameOver || out) && (
-            <button className="btn btn--primary" onClick={join}>
+            <button type="button" className="btn btn--primary" onClick={join}>
               Play again
             </button>
           )}

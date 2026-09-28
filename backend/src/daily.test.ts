@@ -1,5 +1,6 @@
-import { dailyRhythms, DailyStanding } from "@rhythm-royale/common";
-import { DailyBoard } from "./daily";
+import { type DailyStanding, dailyRhythms } from "@rhythm-royale/common";
+import { describe, expect, test } from "vitest";
+import { DailyBoard } from "./daily.js";
 
 const TODAY = "2026-09-28";
 const board = () => new DailyBoard(() => new Date(`${TODAY}T12:00:00Z`));

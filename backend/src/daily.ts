@@ -1,13 +1,13 @@
 import {
   DAILY_DIFFICULTIES,
+  type DailyLeaderboard,
+  type DailyStanding,
   dailyKey,
-  DailyLeaderboard,
   dailyRhythms,
-  DailyStanding,
   isDailyKey,
   scoreAttempt,
 } from "@rhythm-royale/common";
-import { sanitizeName } from "./names";
+import { sanitizeName } from "./names.js";
 
 interface Entry {
   name: string;
@@ -88,8 +88,8 @@ export class DailyBoard {
 
   private prune(): void {
     const keep = this.acceptedDates();
-    Array.from(this.days.keys())
-      .filter((d) => !keep.includes(d))
-      .forEach((d) => this.days.delete(d));
+    for (const date of Array.from(this.days.keys())) {
+      if (!keep.includes(date)) this.days.delete(date);
+    }
   }
 }

@@ -2,20 +2,27 @@
   "name": "rhythm-royale",
   "description": "Rhythm based battle royale game.",
   "private": true,
-  "scripts": {
-    "install": "yarn --cwd common install --production=false && yarn --cwd common build && yarn --cwd backend install --production=false && yarn --cwd frontend install --production=false",
-    "build": "yarn --cwd common build && yarn --cwd frontend build && yarn --cwd backend build",
-    "start": "yarn --cwd backend start",
-    "test": "yarn --cwd common test && yarn --cwd backend test",
-    "dev:server": "yarn --cwd backend dev",
-    "dev:client": "yarn --cwd frontend start"
-  },
+  "type": "module",
+  "packageManager": "pnpm@12.6.0",
   "engines": {
-    "node": ">=18",
-    "yarn": "1.22.x"
+    "node": ">=22.22"
+  },
+  "scripts": {
+    "dev": "pnpm --parallel --filter @rhythm-royale/backend --filter @rhythm-royale/frontend dev",
+    "build": "pnpm --recursive build",
+    "build:offline": "pnpm --filter @rhythm-royale/frontend build:offline",
+    "start": "pnpm --filter @rhythm-royale/backend start",
+    "test": "pnpm --recursive test",
+    "typecheck": "pnpm --recursive typecheck",
+    "lint": "biome check .",
+    "format": "biome check --write ."
   },
   "repository": {
     "type": "git",
     "url": "https://github.com/MichaelClasby0/RhythmRoyale.git"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.5.14",
+    "typescript": "^7.0.2"
   }
 }

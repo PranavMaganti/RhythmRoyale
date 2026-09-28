@@ -1,12 +1,11 @@
 {
+  "extends": "../tsconfig.base.json",
   "compilerOptions": {
-    "module": "commonjs",
-    "target": "es2019",
-    "lib": ["es2019"],
-    "declaration": true,
-    "strict": true,
     "rootDir": "./src",
-    "outDir": "./dist"
+    "outDir": "./dist",
+    "declaration": true,
+    // Timers are used by the match engine, which runs in Node and the browser.
+    "types": ["node"]
   },
-  "include": ["src/**/*.ts"]
+  "include": ["src"]
 }

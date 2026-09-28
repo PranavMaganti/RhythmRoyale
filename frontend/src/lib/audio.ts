@@ -1,8 +1,5 @@
 import * as Tone from "tone";
 
-/** Every rhythm is played on one pitch: the game is about timing, not melody. */
-export const NOTE_PITCH = "A4";
-
 /** Browsers only allow audio after a user gesture; call this from a click handler. */
 export async function unlockAudio(): Promise<void> {
   if (Tone.getContext().state !== "running") {
@@ -17,8 +14,8 @@ export function audioReady(): boolean {
 export interface Instruments {
   /** Plays the phrase. */
   voice: Tone.Synth;
-  /** Echoes the player's own presses so they can hear what they're doing. */
-  echo: Tone.Synth;
+  /** Echoes the player's own presses; polyphonic in case keys overlap. */
+  echo: Tone.PolySynth;
   /** Metronome. */
   click: Tone.MembraneSynth;
   dispose(): void;
@@ -31,8 +28,8 @@ export function createInstruments(): Instruments {
   };
   const voice = new Tone.Synth(voiceOptions).toDestination();
   voice.volume.value = -6;
-  const echo = new Tone.Synth(voiceOptions).toDestination();
-  echo.volume.value = -9;
+  const echo = new Tone.PolySynth(Tone.Synth, voiceOptions).toDestination();
+  echo.volume.value = -10;
   const click = new Tone.MembraneSynth({
     pitchDecay: 0.008,
     octaves: 2,

@@ -1,4 +1,4 @@
-import { pick, Rng } from "@rhythm-royale/common";
+import { pick, type Rng } from "./random.js";
 
 const FIRST = [
   "Tempo",

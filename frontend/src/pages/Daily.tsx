@@ -1,22 +1,22 @@
 import {
   DAILY_DIFFICULTIES,
+  type DailyStanding,
   dailyKey,
   dailyNumber,
   dailyRhythms,
   dailyShareText,
-  DailyStanding,
   msUntilNextDaily,
-  Note,
+  type Note,
   scoreAttempt,
   scoreEmoji,
 } from "@rhythm-royale/common";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link } from "react-router";
 import { formatDuration, useSecondsLeft } from "../components/Countdown";
 import RhythmCompare from "../components/RhythmCompare";
 import RoundPlayer from "../components/RoundPlayer";
 import Shell from "../components/Shell";
-import { backendUrl } from "../config";
+import { backendUrl, OFFLINE } from "../config";
 import { unlockAudio } from "../lib/audio";
 import { load, loadName, playerToken, save, saveName } from "../lib/storage";
 
@@ -52,16 +52,17 @@ export default function Daily() {
   const rhythms = useMemo(() => dailyRhythms(key), [key]);
   const storageKey = `daily:${key}`;
   const [progress, setProgress] = useState<DailyProgress>(() =>
-    load<DailyProgress>(storageKey, { attempts: [], scores: [] })
+    load<DailyProgress>(storageKey, { attempts: [], scores: [] }),
   );
   // Rounds are self-paced: after each one, show how it went until the player moves on.
   const [stage, setStage] = useState<"intro" | "playing" | "review">(
-    progress.scores.length > 0 && progress.scores.length < ROUNDS ? "review" : "intro"
+    progress.scores.length > 0 && progress.scores.length < ROUNDS ? "review" : "intro",
   );
   const [name, setName] = useState(loadName());
   const [streak, setStreak] = useState<Streak | null>(null);
   const [submitError, setSubmitError] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [showShareText, setShowShareText] = useState(false);
 
   const done = progress.scores.length === ROUNDS;
   const current = progress.scores.length;
@@ -71,7 +72,7 @@ export default function Daily() {
       setProgress(next);
       save(storageKey, next);
     },
-    [storageKey]
+    [storageKey],
   );
 
   const onComplete = useCallback(
@@ -83,14 +84,14 @@ export default function Daily() {
       });
       setStage("review");
     },
-    [current, progress, rhythms, update]
+    [current, progress, rhythms, update],
   );
 
   // Once finished, post the taps for server-side scoring and a percentile.
   useEffect(() => {
     if (!done) return;
     setStreak(recordStreak(key));
-    if (progress.standing) return;
+    if (progress.standing || OFFLINE) return;
     let cancelled = false;
     fetch(`${backendUrl}/api/daily`, {
       method: "POST",
@@ -121,29 +122,47 @@ export default function Daily() {
   const nextDailyAt = useMemo(() => (done ? Date.now() + msUntilNextDaily() : null), [done]);
   const nextIn = useSecondsLeft(nextDailyAt);
   const total = progress.scores.reduce((a, b) => a + b, 0);
-  const shareText = dailyShareText(key, progress.scores, `${window.location.origin}/daily`);
+  // The offline build can be opened from anywhere, so its address isn't worth sharing.
+  const shareText = dailyShareText(
+    key,
+    progress.scores,
+    OFFLINE ? undefined : `${window.location.origin}/daily`,
+  );
+
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(shareText);
+      setCopied(true);
+    } catch {
+      // Clipboard refused (some embedded views): show the text to copy by hand.
+      setShowShareText(true);
+    }
+  };
 
   const share = async () => {
+    if (!navigator.share || OFFLINE) return copy();
     try {
-      if (navigator.share) {
-        await navigator.share({ text: shareText });
-      } else {
-        await navigator.clipboard.writeText(shareText);
-        setCopied(true);
-      }
-    } catch {
-      // Share sheet dismissed.
+      await navigator.share({ text: shareText });
+    } catch (e) {
+      // Dismissing the share sheet is fine; anything else falls back to copying.
+      if ((e as Error).name !== "AbortError") await copy();
     }
   };
 
   const emojiRow = (
-    <p className="emoji-row" aria-label="Scores per rhythm">
+    <p
+      className="emoji-row"
+      role="img"
+      aria-label={`Scores: ${progress.scores.join(", ") || "none yet"}`}
+    >
       {progress.scores.map((s, i) => (
+        // biome-ignore lint/suspicious/noArrayIndexKey: one fixed slot per melody
         <span key={i} title={`${s}%`}>
           {scoreEmoji(s)}
         </span>
       ))}
       {Array.from({ length: ROUNDS - progress.scores.length }, (_, i) => (
+        // biome-ignore lint/suspicious/noArrayIndexKey: one fixed slot per melody
         <span key={`todo-${i}`}>⬜</span>
       ))}
     </p>
@@ -174,13 +193,23 @@ export default function Daily() {
             )}
           </div>
           <div className="actions">
-            <button className="btn btn--primary" onClick={share}>
-              {copied ? "Copied!" : "Share result"}
+            <button type="button" className="btn btn--primary" onClick={share}>
+              {copied ? "Copied!" : OFFLINE ? "Copy result" : "Share result"}
             </button>
             <Link className="btn btn--ghost" to="/royale">
               Play Battle Royale
             </Link>
           </div>
+          {showShareText && (
+            <textarea
+              className="share-text"
+              readOnly
+              rows={3}
+              value={shareText}
+              aria-label="Your result, ready to copy"
+              onFocus={(e) => e.currentTarget.select()}
+            />
+          )}
           {submitError && (
             <p className="muted small center">
               Couldn&apos;t reach the leaderboard. Your score is saved on this device.
@@ -197,6 +226,7 @@ export default function Daily() {
               </thead>
               <tbody>
                 {standing.top.map((e, i) => (
+                  // biome-ignore lint/suspicious/noArrayIndexKey: rank is the identity here
                   <tr key={i}>
                     <td>{i + 1}</td>
                     <td>{e.name}</td>
@@ -206,11 +236,12 @@ export default function Daily() {
               </tbody>
             </table>
           )}
-          <h2 className="section-title">Your rhythms</h2>
+          <h2 className="section-title">Your melodies</h2>
           {rhythms.map((r, i) => (
+            // biome-ignore lint/suspicious/noArrayIndexKey: the day's melodies never reorder
             <div key={i} className="daily-review">
               <p>
-                Rhythm {i + 1} · <strong>{progress.scores[i]}%</strong>
+                Melody {i + 1} · <strong>{progress.scores[i]}%</strong>
               </p>
               <RhythmCompare rhythm={r} attempt={progress.attempts[i] ?? []} />
             </div>
@@ -230,7 +261,7 @@ export default function Daily() {
           onComplete={onComplete}
           heading={
             <>
-              Daily #{dailyNumber(key)} · Rhythm {current + 1} of {ROUNDS}
+              Daily #{dailyNumber(key)} · Melody {current + 1} of {ROUNDS}
             </>
           }
         />
@@ -245,15 +276,15 @@ export default function Daily() {
         <section className="results">
           <div className="result-banner">
             <p className="muted">
-              Rhythm {last + 1} of {ROUNDS}
+              Melody {last + 1} of {ROUNDS}
             </p>
             <h1>{progress.scores[last]}%</h1>
             {emojiRow}
           </div>
           <RhythmCompare rhythm={rhythms[last]} attempt={progress.attempts[last]} />
           <div className="actions">
-            <button className="btn btn--primary" onClick={start} autoFocus>
-              Next rhythm →
+            <button type="button" className="btn btn--primary" onClick={start}>
+              Next melody →
             </button>
           </div>
         </section>
@@ -267,15 +298,15 @@ export default function Daily() {
         <p className="muted">Daily challenge</p>
         <h1>#{dailyNumber(key)}</h1>
         <p className="muted">
-          Five rhythms, the same for everyone today, each harder than the last. You get{" "}
-          <strong>one attempt</strong> at each, so make it count.
+          Five melodies, the same for everyone today, each harder than the last, ending with all six
+          notes. You get <strong>one attempt</strong> at each, so make it count.
         </p>
         {emojiRow}
         <label className="field">
           <span>Name for the leaderboard</span>
           <input value={name} maxLength={16} onChange={(e) => setName(e.target.value)} />
         </label>
-        <button className="btn btn--primary" onClick={start}>
+        <button type="button" className="btn btn--primary" onClick={start}>
           {current === 0 ? "Start" : "Continue"}
         </button>
       </section>

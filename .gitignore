@@ -129,3 +129,7 @@ yarn-error.log*
 
 #IDES
 .idea/
+
+# pnpm / Vite
+.pnpm-store/
+frontend/dist-offline

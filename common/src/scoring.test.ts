@@ -1,16 +1,18 @@
-import { simulateAttempt } from "./bots";
-import { seededRng } from "./random";
-import { generateRhythm, Note, Rhythm } from "./rhythm";
-import { sanitizeNotes, scoreAttempt } from "./scoring";
+import { describe, expect, test } from "vitest";
+import { simulateAttempt } from "./bots.js";
+import { seededRng } from "./random.js";
+import { generateRhythm, type Note, type Rhythm } from "./rhythm.js";
+import { sanitizeNotes, scoreAttempt, WRONG_PITCH_CREDIT } from "./scoring.js";
 
 const rhythm: Rhythm = {
   bpm: 120,
   beats: 4,
+  pitches: 1,
   notes: [
-    { start: 0, duration: 250 },
-    { start: 500, duration: 250 },
-    { start: 1000, duration: 500 },
-    { start: 1750, duration: 250 },
+    { start: 0, duration: 250, pitch: 0 },
+    { start: 500, duration: 250, pitch: 0 },
+    { start: 1000, duration: 500, pitch: 0 },
+    { start: 1750, duration: 250, pitch: 0 },
   ],
 };
 
@@ -32,6 +34,7 @@ describe("scoreAttempt", () => {
 
   test("small human jitter is still perfect", () => {
     const jittered = rhythm.notes.map((n, i) => ({
+      ...n,
       start: n.start + (i % 2 ? 25 : -25),
       duration: n.duration + 40,
     }));
@@ -57,7 +60,7 @@ describe("scoreAttempt", () => {
 
   test("spamming extra taps is penalised", () => {
     const spam: Note[] = [];
-    for (let t = 0; t < 2000; t += 125) spam.push({ start: t, duration: 60 });
+    for (let t = 0; t < 2000; t += 125) spam.push({ start: t, duration: 60, pitch: 0 });
     expect(scoreAttempt(rhythm, spam).score).toBeLessThan(40);
   });
 
@@ -78,7 +81,12 @@ describe("scoreAttempt", () => {
   });
 
   test("ignores malformed input", () => {
-    const junk = [null, { start: "x" }, { start: 0, duration: -1 }, { start: NaN, duration: 1 }];
+    const junk = [
+      null,
+      { start: "x" },
+      { start: 0, duration: -1, pitch: 0 },
+      { start: NaN, duration: 1, pitch: 0 },
+    ];
     expect(scoreAttempt(rhythm, junk as unknown as Note[]).score).toBe(0);
   });
 });
@@ -86,11 +94,11 @@ describe("scoreAttempt", () => {
 describe("sanitizeNotes", () => {
   test("sorts and caps notes", () => {
     const notes = sanitizeNotes([
-      { start: 20, duration: 1 },
-      { start: 10, duration: 1 },
+      { start: 20, duration: 1, pitch: 0 },
+      { start: 10, duration: 1, pitch: 0 },
     ]);
     expect(notes.map((n) => n.start)).toEqual([10, 20]);
-    expect(sanitizeNotes(new Array(100).fill({ start: 0, duration: 1 })).length).toBe(64);
+    expect(sanitizeNotes(new Array(100).fill({ start: 0, duration: 1, pitch: 0 })).length).toBe(64);
     expect(sanitizeNotes("nope")).toEqual([]);
   });
 });
@@ -120,5 +128,77 @@ describe("simulateAttempt", () => {
     const avg = average(0.9, 4);
     expect(avg).toBeGreaterThan(75);
     expect(avg).toBeLessThan(100);
+  });
+});
+
+describe("pitch", () => {
+  const melody: Rhythm = {
+    bpm: 120,
+    beats: 4,
+    pitches: 3,
+    notes: [
+      { start: 0, duration: 250, pitch: 0 },
+      { start: 500, duration: 250, pitch: 2 },
+      { start: 1000, duration: 250, pitch: 1 },
+    ],
+  };
+
+  test("right keys at the right time is perfect", () => {
+    const result = scoreAttempt(melody, melody.notes);
+    expect(result.score).toBe(100);
+    expect(result.wrongPitches).toBe(0);
+  });
+
+  test("right rhythm on the wrong key keeps some credit", () => {
+    const oneKey = { ...melody, notes: melody.notes.map((n) => ({ ...n, pitch: 0 })) };
+    const wrong = oneKey.notes.map((n) => ({ ...n, pitch: 1 }));
+    const result = scoreAttempt(oneKey, wrong);
+    expect(result.score).toBe(Math.round(100 * WRONG_PITCH_CREDIT));
+    expect(result.wrongPitches).toBe(3);
+    expect(result.misses).toBe(0);
+  });
+
+  test("one wrong key costs part of one note", () => {
+    const oneOff = melody.notes.map((n, i) => (i === 1 ? { ...n, pitch: 1 } : n));
+    const score = scoreAttempt(melody, oneOff).score;
+    expect(score).toBeLessThan(100);
+    expect(score).toBeGreaterThan(70);
+  });
+
+  test("sanitizeNotes keeps valid pitches and defaults the rest", () => {
+    const notes = sanitizeNotes([
+      { start: 0, duration: 1, pitch: 4 },
+      { start: 1, duration: 1, pitch: -1 },
+      { start: 2, duration: 1 },
+      { start: 3, duration: 1, pitch: 1.5 },
+    ]);
+    expect(notes.map((n) => n.pitch)).toEqual([4, 0, 0, 0]);
+  });
+});
+
+describe("simulateAttempt pitch errors", () => {
+  test("weaker bots press the wrong key more often", () => {
+    const wrongRate = (skill: number): number => {
+      const rng = seededRng(`pitch-${skill}`);
+      let wrong = 0;
+      let total = 0;
+      for (let i = 0; i < 300; i++) {
+        const r = generateRhythm(4, rng);
+        const result = scoreAttempt(r, simulateAttempt(r, skill, rng));
+        wrong += result.wrongPitches;
+        total += r.notes.length;
+      }
+      return wrong / total;
+    };
+    expect(wrongRate(0.2)).toBeGreaterThan(wrongRate(0.8));
+    expect(wrongRate(0.95)).toBeLessThan(0.05);
+  });
+
+  test("single-pitch rhythms never produce wrong keys", () => {
+    const rng = seededRng("mono");
+    for (let i = 0; i < 100; i++) {
+      const r = generateRhythm(1, rng);
+      expect(simulateAttempt(r, 0, rng).every((n) => n.pitch === 0)).toBe(true);
+    }
   });
 });

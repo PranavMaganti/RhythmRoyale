@@ -1,4 +1,4 @@
-import { beatMs, Note, Rhythm } from "./rhythm";
+import { beatMs, type Note, type Rhythm } from "./rhythm.js";
 
 /** Onset errors inside this window count as perfect (typical human tap jitter). */
 const PERFECT_ONSET_MS = 35;
@@ -6,6 +6,8 @@ const PERFECT_ONSET_MS = 35;
 const PERFECT_DURATION_MS = 70;
 const ONSET_WEIGHT = 0.75;
 const DURATION_WEIGHT = 1 - ONSET_WEIGHT;
+/** Share of a note's credit kept when the timing is right but the key is wrong. */
+export const WRONG_PITCH_CREDIT = 0.3;
 /** Largest constant offset we forgive (covers audio/input latency and a nervous start). */
 const MAX_OFFSET_BEATS = 1.5;
 
@@ -14,6 +16,8 @@ export interface NoteMatch {
   attempt: number;
   /** 0..1 credit for this pairing. */
   credit: number;
+  /** Whether the right key was pressed. */
+  pitchOk: boolean;
 }
 
 export interface AttemptScore {
@@ -24,6 +28,8 @@ export interface AttemptScore {
   matches: NoteMatch[];
   misses: number;
   extras: number;
+  /** Notes that were timed right but played on the wrong key. */
+  wrongPitches: number;
 }
 
 function clamp01(x: number): number {
@@ -40,10 +46,14 @@ export function sanitizeNotes(notes: unknown, maxNotes = 64): Note[] {
         typeof n === "object" &&
         Number.isFinite((n as Note).start) &&
         Number.isFinite((n as Note).duration) &&
-        (n as Note).duration >= 0
+        (n as Note).duration >= 0,
     )
     .slice(0, maxNotes)
-    .map((n) => ({ start: n.start, duration: n.duration }))
+    .map((n) => ({
+      start: n.start,
+      duration: n.duration,
+      pitch: Number.isInteger(n.pitch) && n.pitch >= 0 && n.pitch < 16 ? n.pitch : 0,
+    }))
     .sort((a, b) => a.start - b.start);
 }
 
@@ -53,9 +63,10 @@ function noteCredit(target: Note, attempt: Note, window: number): number {
   const onset = clamp01(1 - Math.max(0, onsetErr - PERFECT_ONSET_MS) / (window - PERFECT_ONSET_MS));
   const durErr = Math.abs(target.duration - attempt.duration);
   const duration = clamp01(
-    1 - Math.max(0, durErr - PERFECT_DURATION_MS) / Math.max(target.duration, 150)
+    1 - Math.max(0, durErr - PERFECT_DURATION_MS) / Math.max(target.duration, 150),
   );
-  return ONSET_WEIGHT * onset + DURATION_WEIGHT * duration;
+  const timing = ONSET_WEIGHT * onset + DURATION_WEIGHT * duration;
+  return target.pitch === attempt.pitch ? timing : timing * WRONG_PITCH_CREDIT;
 }
 
 /**
@@ -65,7 +76,7 @@ function noteCredit(target: Note, attempt: Note, window: number): number {
 function align(
   target: Note[],
   attempt: Note[],
-  window: number
+  window: number,
 ): { total: number; matches: NoteMatch[] } {
   const n = target.length;
   const m = attempt.length;
@@ -83,7 +94,12 @@ function align(
   while (i > 0 && j > 0) {
     const c = noteCredit(target[i - 1], attempt[j - 1], window);
     if (c > 0 && dp[i][j] === dp[i - 1][j - 1] + c) {
-      matches.push({ target: i - 1, attempt: j - 1, credit: c });
+      matches.push({
+        target: i - 1,
+        attempt: j - 1,
+        credit: c,
+        pitchOk: target[i - 1].pitch === attempt[j - 1].pitch,
+      });
       i--;
       j--;
     } else if (dp[i][j] === dp[i - 1][j]) {
@@ -105,6 +121,7 @@ export function scoreAttempt(rhythm: Rhythm, rawAttempt: Note[]): AttemptScore {
     matches: [],
     misses: target.length,
     extras: attempt.length,
+    wrongPitches: 0,
   };
   if (target.length === 0 || attempt.length === 0) return empty;
 
@@ -134,6 +151,7 @@ export function scoreAttempt(rhythm: Rhythm, rawAttempt: Note[]): AttemptScore {
         matches,
         misses: target.length - matches.length,
         extras: attempt.length - matches.length,
+        wrongPitches: matches.filter((m) => !m.pitchOk).length,
       };
     }
   });

@@ -1,5 +1,10 @@
-import { Rng } from "@rhythm-royale/common";
-import { DEFAULT_MATCH_CONFIG, Match, MatchConfig, MatchTransport } from "./match";
+import {
+  DEFAULT_MATCH_CONFIG,
+  Match,
+  type MatchConfig,
+  type MatchTransport,
+  type Rng,
+} from "@rhythm-royale/common";
 
 export interface RoomHooks {
   /** Called before the player is added so they receive the first lobby update. */
@@ -16,7 +21,7 @@ export class Matchmaker {
     private readonly transportFor: (matchId: string) => MatchTransport,
     private readonly rooms: RoomHooks,
     private readonly config: MatchConfig = DEFAULT_MATCH_CONFIG,
-    private readonly rng: Rng = Math.random
+    private readonly rng: Rng = Math.random,
   ) {}
 
   join(playerId: string, name: string): Match {
@@ -29,7 +34,7 @@ export class Matchmaker {
         this.transportFor(id),
         (m) => this.onFinished(m),
         this.config,
-        this.rng
+        this.rng,
       );
       this.matches.set(id, match);
     }

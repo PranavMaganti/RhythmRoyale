@@ -1,7 +1,8 @@
-import { dailyKey, DAILY_DIFFICULTIES, dailyNumber } from "@rhythm-royale/common";
+import { DAILY_DIFFICULTIES, dailyKey, dailyNumber } from "@rhythm-royale/common";
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router";
 import Shell from "../components/Shell";
+import { OFFLINE } from "../config";
 import { unlockAudio } from "../lib/audio";
 import { load, loadName, saveName } from "../lib/storage";
 import type { DailyProgress } from "./Daily";
@@ -25,11 +26,11 @@ export default function Home() {
     <Shell>
       <section className="hero">
         <h1 className="hero-title">
-          Hear it. <span className="accent">Tap it.</span> Outlast everyone.
+          Hear it. <span className="accent">Play it.</span> Outlast everyone.
         </h1>
         <p className="muted hero-sub">
-          Each round plays a short rhythm. Tap it back as precisely as you can. The least accurate
-          players are knocked out until one is left standing.
+          Each round plays a short melody. Play it back as precisely as you can. The least accurate
+          players are knocked out, and every round adds another note to choose from, up to six.
         </p>
         <label className="field">
           <span>Nickname</span>
@@ -38,19 +39,23 @@ export default function Home() {
             maxLength={16}
             placeholder="Your name"
             onChange={(e) => setName(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && go("/royale")}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") go("/royale");
+            }}
           />
         </label>
       </section>
 
       <section className="modes">
-        <button className="mode mode--primary" onClick={() => go("/royale")}>
+        <button type="button" className="mode mode--primary" onClick={() => go("/royale")}>
           <span className="mode-title">Battle Royale</span>
           <span className="mode-desc">
-            Up to 10 players. Bots fill the empty seats. Last one standing wins.
+            {OFFLINE
+              ? "You against nine bots. Last one standing wins."
+              : "Up to 10 players. Bots fill the empty seats. Last one standing wins."}
           </span>
         </button>
-        <button className="mode" onClick={() => go("/daily")}>
+        <button type="button" className="mode" onClick={() => go("/daily")}>
           <span className="mode-title">
             Daily #{dailyNumber(today)}
             {dailyDone && (
@@ -65,7 +70,7 @@ export default function Home() {
               : "Five rhythms, the same for everyone, one attempt each."}
           </span>
         </button>
-        <button className="mode" onClick={() => go("/practice")}>
+        <button type="button" className="mode" onClick={() => go("/practice")}>
           <span className="mode-title">Practice</span>
           <span className="mode-desc">Pick a difficulty and replay as often as you like.</span>
         </button>
@@ -75,11 +80,14 @@ export default function Home() {
         <h2>How to play</h2>
         <ol>
           <li>
-            <strong>Listen.</strong> Four clicks count you in, then the rhythm plays once.
+            <strong>Listen.</strong> When there&apos;s more than one note, you first hear each one
+            from low to high. Then four clicks count you in and the melody plays once.
           </li>
           <li>
-            <strong>Play it back.</strong> After another count-in, hold <kbd>Space</kbd> (or the pad
-            on a phone) for each note, as long as it sounded.
+            <strong>Play it back.</strong> After another count-in, hold each note&apos;s key for as
+            long as it sounded: <kbd>Space</kbd> for one note, then home-row keys like <kbd>F</kbd>{" "}
+            <kbd>J</kbd> up to <kbd>S</kbd> <kbd>D</kbd> <kbd>F</kbd> <kbd>J</kbd> <kbd>K</kbd>{" "}
+            <kbd>L</kbd>. On a phone, tap the coloured pads.
           </li>
           <li>
             <strong>Survive.</strong> Timing matters most, note length a little. A steady delay from

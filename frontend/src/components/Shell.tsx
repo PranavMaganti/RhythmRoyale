@@ -1,5 +1,5 @@
-import { ReactNode } from "react";
-import { Link } from "react-router-dom";
+import type { ReactNode } from "react";
+import { Link } from "react-router";
 
 export default function Shell({ children, wide }: { children: ReactNode; wide?: boolean }) {
   return (

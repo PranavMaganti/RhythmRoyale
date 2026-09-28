@@ -1,4 +1,11 @@
-import { generateRhythm, MAX_DIFFICULTY, Note, Rhythm, scoreAttempt } from "@rhythm-royale/common";
+import {
+  DIFFICULTIES,
+  generateRhythm,
+  MAX_DIFFICULTY,
+  type Note,
+  type Rhythm,
+  scoreAttempt,
+} from "@rhythm-royale/common";
 import { useState } from "react";
 import RhythmCompare from "../components/RhythmCompare";
 import RoundPlayer from "../components/RoundPlayer";
@@ -25,19 +32,21 @@ export default function Practice() {
   };
 
   const levels = (
-    <div className="chips" role="radiogroup" aria-label="Difficulty">
+    <fieldset className="chips">
+      <legend className="visually-hidden">Difficulty</legend>
       {Array.from({ length: MAX_DIFFICULTY }, (_, i) => i + 1).map((level) => (
         <button
+          type="button"
           key={level}
-          role="radio"
-          aria-checked={difficulty === level}
+          aria-pressed={difficulty === level}
+          title={`${DIFFICULTIES[level - 1].pitches} note${DIFFICULTIES[level - 1].pitches === 1 ? "" : "s"}`}
           className={`chip${difficulty === level ? " chip--on" : ""}`}
           onClick={() => pickLevel(level)}
         >
           {level}
         </button>
       ))}
-    </div>
+    </fieldset>
   );
 
   if (rhythm && !attempt) {
@@ -47,7 +56,12 @@ export default function Practice() {
           key={run}
           rhythm={rhythm}
           onComplete={setAttempt}
-          heading={<>Practice · level {difficulty}</>}
+          heading={
+            <>
+              Practice · level {difficulty} · {rhythm.pitches} note
+              {rhythm.pitches === 1 ? "" : "s"}
+            </>
+          }
         />
       </Shell>
     );
@@ -59,20 +73,22 @@ export default function Practice() {
       <Shell wide>
         <section className="results">
           <div className={`result-banner ${score >= 85 ? "result-banner--safe" : ""}`}>
-            <p className="muted">Practice · level {difficulty}</p>
+            <p className="muted">
+              Practice · level {difficulty} · {rhythm.pitches} note{rhythm.pitches === 1 ? "" : "s"}
+            </p>
             <h1>{score}%</h1>
           </div>
           <RhythmCompare rhythm={rhythm} attempt={attempt} />
           <div className="actions">
-            <button className="btn btn--ghost" onClick={() => play(rhythm)}>
+            <button type="button" className="btn btn--ghost" onClick={() => play(rhythm)}>
               Try this one again
             </button>
             <button
+              type="button"
               className="btn btn--primary"
               onClick={() => play(generateRhythm(difficulty))}
-              autoFocus
             >
-              New rhythm
+              New melody
             </button>
           </div>
           <div className="center">
@@ -89,11 +105,16 @@ export default function Practice() {
       <section className="card center">
         <h1>Practice</h1>
         <p className="muted">
-          No pressure. Level 1 is a few slow notes; level {MAX_DIFFICULTY} is fast sixteenth-note
-          phrases like the late rounds of a royale.
+          No pressure. Each level adds a note to choose from: level 1 is a few slow taps on one
+          note; level {MAX_DIFFICULTY} is quick phrases across all six, like the final round of a
+          royale.
         </p>
         {levels}
-        <button className="btn btn--primary" onClick={() => play(generateRhythm(difficulty))}>
+        <button
+          type="button"
+          className="btn btn--primary"
+          onClick={() => play(generateRhythm(difficulty))}
+        >
           Start
         </button>
       </section>

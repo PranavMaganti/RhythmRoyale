@@ -1,5 +1,6 @@
-import { seededRng } from "@rhythm-royale/common";
-import { botName, botSkills, normalQuantile } from "./bots";
+import { describe, expect, test } from "vitest";
+import { botName, botSkills, normalQuantile } from "./botNames.js";
+import { seededRng } from "./index.js";
 
 describe("normalQuantile", () => {
   test("matches known points of the standard normal", () => {

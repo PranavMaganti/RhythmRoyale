@@ -1,5 +1,6 @@
-import { seededRng, ServerToClientEvents } from "@rhythm-royale/common";
-import { MatchConfig, MatchTransport } from "./match";
+import type { MatchConfig, MatchTransport } from "./match.js";
+import type { ServerToClientEvents } from "./protocol.js";
+import { seededRng } from "./random.js";
 
 type EventName = keyof ServerToClientEvents;
 

@@ -1,3 +1,4 @@
+import { describe, expect, test } from "vitest";
 import {
   DAILY_DIFFICULTIES,
   dailyKey,
@@ -7,7 +8,7 @@ import {
   isDailyKey,
   msUntilNextDaily,
   scoreEmoji,
-} from "./daily";
+} from "./daily.js";
 
 describe("daily challenge", () => {
   test("everyone gets the same rhythms on the same day", () => {
@@ -38,7 +39,7 @@ describe("daily challenge", () => {
     expect(scoreEmoji(70)).toBe("🟨");
     expect(scoreEmoji(10)).toBe("🟥");
     expect(dailyShareText("2026-01-03", [90, 70, 10, 100, 85])).toBe(
-      "Rhythm Royale Daily #3\n🟩🟨🟥🟩🟩 355/500"
+      "Rhythm Royale Daily #3\n🟩🟨🟥🟩🟩 355/500",
     );
   });
 });

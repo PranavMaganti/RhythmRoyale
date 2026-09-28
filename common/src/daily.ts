@@ -1,8 +1,8 @@
-import { seededRng } from "./random";
-import { generateRhythm, Rhythm } from "./rhythm";
+import { seededRng } from "./random.js";
+import { generateRhythm, type Rhythm } from "./rhythm.js";
 
 /** Difficulty of each rhythm in the daily set, easiest first. */
-export const DAILY_DIFFICULTIES = [1, 2, 3, 4, 5];
+export const DAILY_DIFFICULTIES = [1, 2, 3, 5, 6];
 const DAILY_EPOCH = Date.UTC(2026, 0, 1);
 const DAY_MS = 24 * 60 * 60 * 1000;
 

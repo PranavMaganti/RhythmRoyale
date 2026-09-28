@@ -1,12 +1,19 @@
-import { LobbyState } from "@rhythm-royale/common";
-import { Matchmaker } from "./matchmaker";
-import { lastPayload, recordingTransport, SentEvent, TEST_CONFIG, testRng } from "./testing";
+import type { LobbyState } from "@rhythm-royale/common";
+import {
+  lastPayload,
+  recordingTransport,
+  type SentEvent,
+  TEST_CONFIG,
+  testRng,
+} from "@rhythm-royale/common/testing";
+import { describe, expect, test, vi } from "vitest";
+import { Matchmaker } from "./matchmaker.js";
 
-jest.useFakeTimers();
+vi.useFakeTimers();
 
 function setup() {
   const log: SentEvent[] = [];
-  const rooms = { joinRoom: jest.fn(), leaveRoom: jest.fn() };
+  const rooms = { joinRoom: vi.fn(), leaveRoom: vi.fn() };
   const mm = new Matchmaker((id) => recordingTransport(log, id), rooms, TEST_CONFIG, testRng());
   return { log, rooms, mm };
 }
@@ -44,7 +51,7 @@ describe("Matchmaker", () => {
     mm.join("a", "Alice");
     mm.join("b", "Bob");
     const first = mm.matchOf("a");
-    jest.advanceTimersByTime(TEST_CONFIG.lobbyWaitMs);
+    vi.advanceTimersByTime(TEST_CONFIG.lobbyWaitMs);
     const second = mm.join("a", "Alice");
     expect(second).not.toBe(first);
     expect(first?.players.get("a")?.alive).toBe(false);

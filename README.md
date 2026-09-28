@@ -1,41 +1,70 @@
 # Rhythm Royale
 
-Hear a rhythm, tap it back, outlast everyone. Originally an ICHACK 2022 submission.
+Hear a melody, play it back, outlast everyone. Originally an ICHACK 2022 submission.
 
 ## Game modes
 
 - **Battle Royale**: up to 10 players share a lobby. After 15 seconds (or as soon as the lobby
-  is full) any empty seats are filled with bots and the first rhythm plays. Everyone hears the
-  same phrase, plays it back, and the least accurate ~30% are knocked out. The rhythms get
-  harder each round until one player is left. Knocked-out players can keep watching or requeue
-  straight away.
-- **Daily challenge**: five rhythms per day, the same for everyone (seeded from the UTC date),
+  is full) any empty seats are filled with bots and the first melody plays. Everyone hears the
+  same phrase, plays it back, and the least accurate ~30% are knocked out until one player is
+  left. Knocked-out players can keep watching or requeue straight away.
+- **Daily challenge**: five melodies per day, the same for everyone (seeded from the UTC date),
   easiest first, one attempt each. You get an emoji result card to share, a streak, and a
   percentile against everyone else who played that day.
-- **Practice**: pick a difficulty from 1 to 6 and replay as much as you like.
+- **Practice**: pick a level from 1 to 6 and replay as much as you like.
 
-Each round goes like this: four count-in clicks, then the phrase plays once. Four more clicks,
-then the player holds <kbd>Space</kbd> (or the on-screen pad on touch devices) for each note.
+If the server can't be reached, the Battle Royale screen offers to play offline: the same match
+engine runs in the browser against bots.
+
+### Pitches
+
+Each difficulty level adds a note to choose from, from a single tone at level 1 up to six at
+level 6, while the rhythms get harder more slowly. A royale plans its rounds when it starts and
+spreads the levels across them, so the first round is always one note and the final round
+always uses all six.
+
+The notes come from a major pentatonic scale (C D E G A C), so any combination sounds musical
+and there are no semitone steps to confuse. When there are only a few notes they sit further
+apart (two notes are an octave apart). Keys follow the home row, with the thumb on Space in the
+middle:
+
+| Notes | Keys          |
+| ----- | ------------- |
+| 1     | Space         |
+| 2     | F J           |
+| 3     | F Space J     |
+| 4     | D F J K       |
+| 5     | D F Space J K |
+| 6     | S D F J K L   |
+
+On touch screens each note gets its own coloured pad.
+
+### A round
+
+1. With more than one note, each note plays once from low to high while its pad lights up.
+2. Four count-in clicks, then the melody plays once.
+3. Four more clicks, then the player holds each note's key for as long as it sounded.
 
 ## Scoring
 
 Scoring lives in `common/src/scoring.ts` and is shared by the browser, the server and the bots:
 
-- Taps are aligned to the target with an order-preserving alignment, so one missed or extra
+- Presses are aligned to the target with an order-preserving alignment, so one missed or extra
   note only costs that note.
 - Each note earns credit for onset timing (75%) and held length (25%). Errors under ~35 ms
-  count as perfect.
+  count as perfect. The right timing on the wrong key keeps 30% of the note's credit.
 - A constant offset is forgiven, so Bluetooth headphones or a slow device don't cost points.
-- `100 × credit / max(target notes, tapped notes)`, so spamming taps doesn't help.
+- `100 × credit / max(target notes, pressed notes)`, so mashing keys doesn't help.
 
-The server always recomputes scores from the raw taps (royale and daily leaderboard), so a
+The server always recomputes scores from the raw presses (royale and daily leaderboard), so a
 modified client can't just claim 100%.
 
 ## Bots
 
 Bots go through the same scoring as people. `simulateAttempt` in `common/src/bots.ts` models
-human-style mistakes: forgotten notes, notes on the wrong subdivision, stray taps and timing
-jitter. These get more likely as phrases get longer.
+human-style mistakes: forgotten notes, notes on the wrong subdivision, stray presses, timing
+jitter and wrong keys (usually a neighbouring one). These get more likely as phrases get
+longer and there are more keys to choose from.
 
 Bot skill follows a bell curve, like a real player base: most bots are middling and a few are
 very strong or very weak (`BOT_SKILL_MEAN` 0.4, `BOT_SKILL_SD` 0.2). Skills are drawn one per
@@ -49,45 +78,60 @@ instantly instead of making people watch.
 
 ## Project layout
 
+A pnpm workspace with three TypeScript (ES module) packages:
+
 ```
-common/    Shared TypeScript: rhythm generation, scoring, bots, daily seed, socket protocol
-backend/   Express + Socket.IO server: matchmaking, match state machine, daily leaderboard
-frontend/  React app (Tone.js audio)
+common/    Rhythm generation, scoring, bots, the match engine, daily seed, socket protocol
+backend/   Express + Socket.IO server: matchmaking, daily leaderboard
+frontend/  React + Vite app (Tone.js audio)
 ```
 
-`backend` and `frontend` depend on `common` through `link:../common`, so `common` must be built
-first. The root scripts handle that.
+`common` is consumed from its TypeScript source during development, type-checking and tests
+(the `source` export condition), so it only needs building for production.
+
+Stack: Node 24, pnpm, TypeScript 7, Vite 8, React 19, React Router 8, Express 5, Socket.IO 4,
+Tone.js 15, Vitest and Biome (lint + format).
 
 ## Running locally
 
-Requires Node 20 and Yarn 1.
+Requires Node 22.22 or newer. pnpm is provided by Corepack (`corepack enable`).
 
 ```sh
-yarn install          # installs every package and builds common
-yarn dev:server       # API + sockets on http://localhost:5000
-yarn dev:client       # React dev server on http://localhost:3000
+pnpm install
+pnpm dev              # server on :5000 and the app on http://localhost:5173
 ```
 
-Tests and a production build:
+Checks and a production build:
 
 ```sh
-yarn test             # common + backend unit tests
-yarn build            # common, frontend, backend
-yarn start            # serves the built frontend and the API from one process
+pnpm lint             # Biome lint + format check (pnpm format to fix)
+pnpm typecheck
+pnpm test
+pnpm build            # common, frontend, backend
+pnpm start            # serves the built app and the API on http://localhost:5000
 ```
+
+`pnpm build:offline` produces `frontend/dist-offline/index.html`, a single self-contained page
+with Practice, Daily and Battle Royale against bots that works with no server at all.
+
+### Deploying
+
+`render.yaml` is a Render blueprint: in Render choose New > Blueprint and pick this repository.
+Any host that runs Node works: build with `pnpm install && pnpm build`, start with
+`pnpm start`.
 
 ### Server configuration
 
-| Variable        | Default | Meaning                                         |
-| --------------- | ------- | ----------------------------------------------- |
-| `PORT`          | 5000    | HTTP port                                       |
-| `MAX_PLAYERS`   | 10      | Seats per battle royale lobby                   |
-| `LOBBY_WAIT_MS` | 15000   | How long a lobby waits for people before bots   |
-| `BOT_SKILL_MEAN`| 0.4     | Average bot skill (0–1)                         |
-| `BOT_SKILL_SD`  | 0.2     | Spread of bot skill                             |
+| Variable         | Default | Meaning                                       |
+| ---------------- | ------- | --------------------------------------------- |
+| `PORT`           | 5000    | HTTP port                                     |
+| `MAX_PLAYERS`    | 10      | Seats per battle royale lobby                 |
+| `LOBBY_WAIT_MS`  | 15000   | How long a lobby waits for people before bots |
+| `BOT_SKILL_MEAN` | 0.4     | Average bot skill (0–1)                       |
+| `BOT_SKILL_SD`   | 0.2     | Spread of bot skill                           |
 
-The frontend talks to the same origin in production. Set `REACT_APP_BACKEND_URL` at build time
-to host it separately.
+The app talks to its own origin by default. Set `VITE_BACKEND_URL` at build time to host it
+separately from the server.
 
 ## Known limitations
 

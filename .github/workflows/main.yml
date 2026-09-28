@@ -13,23 +13,23 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
-          cache: yarn
-          cache-dependency-path: "**/yarn.lock"
+          node-version: "24"
 
-      # The root install script installs every package and builds `common`,
-      # which the backend and frontend link to.
+      # pnpm version comes from `packageManager` in package.json.
+      - name: Enable pnpm
+        run: corepack enable
+
       - name: Install dependencies
-        run: yarn install
+        run: pnpm install --frozen-lockfile
 
-      - name: Lint common
-        run: yarn --cwd common lint
+      - name: Lint and format check
+        run: pnpm lint
 
-      - name: Typecheck backend
-        run: yarn --cwd backend typecheck
+      - name: Typecheck
+        run: pnpm typecheck
 
-      - name: Run tests
-        run: yarn test
+      - name: Test
+        run: pnpm test
 
       - name: Build
-        run: CI=true yarn build
+        run: pnpm build && pnpm build:offline

@@ -1,4 +1,5 @@
-import { sanitizeName } from "./names";
+import { expect, test } from "vitest";
+import { sanitizeName } from "./names.js";
 
 test("sanitizeName trims, strips markup and falls back to a default", () => {
   expect(sanitizeName("  Ann  ")).toBe("Ann");

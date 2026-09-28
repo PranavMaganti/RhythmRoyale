@@ -1,0 +1,12 @@
+# One-click deploy on Render (https://render.com): New > Blueprint, pick this repo.
+services:
+  - type: web
+    name: rhythm-royale
+    runtime: node
+    plan: free
+    buildCommand: corepack enable && pnpm install --frozen-lockfile && pnpm build
+    startCommand: pnpm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_VERSION
+        value: "24"
