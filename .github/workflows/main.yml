@@ -1,5 +1,5 @@
-name: 'build-test'
-on: 
+name: build-test
+on:
   pull_request:
   push:
     branches:
@@ -9,29 +9,27 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
       - name: Setup Node.js
-        uses: actions/setup-node@v1
+        uses: actions/setup-node@v4
         with:
-          node-version: "17.3.0"
+          node-version: "20"
+          cache: yarn
+          cache-dependency-path: "**/yarn.lock"
 
-      - name: Cache node modules
-        uses: actions/cache@v2
-        env:
-          cache-name: cache-node-modules
-        with:
-          path: ~/.npm
-          key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ hashFiles('**/yarn.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-build-${{ env.cache-name }}-
-            ${{ runner.os }}-build-
-            ${{ runner.os }}-
+      # The root install script installs every package and builds `common`,
+      # which the backend and frontend link to.
+      - name: Install dependencies
+        run: yarn install
 
-      - name: Install Dependencies
-        run: yarn --cwd common install
+      - name: Lint common
+        run: yarn --cwd common lint
 
-      - name: Check build/types
-        run: yarn --cwd common build
+      - name: Typecheck backend
+        run: yarn --cwd backend typecheck
 
-      - name: Run the tests
-        run: yarn --cwd common test
+      - name: Run tests
+        run: yarn test
+
+      - name: Build
+        run: CI=true yarn build

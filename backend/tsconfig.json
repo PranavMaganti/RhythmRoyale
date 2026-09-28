@@ -1,12 +1,14 @@
 {
   "compilerOptions": {
-    "target": "esnext",
+    "target": "es2019",
     "module": "commonjs",
+    "rootDir": "./src",
     "outDir": "./dist",
     "strict": true,
     "esModuleInterop": true,
-    "inlineSourceMap": true,
-    "noImplicitAny": false
+    "skipLibCheck": true,
+    "types": ["node", "jest"],
+    "inlineSourceMap": true
   },
-  "include": ["**/*"]
+  "include": ["src/**/*.ts"]
 }

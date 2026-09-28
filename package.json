@@ -1,14 +1,18 @@
 {
   "name": "rhythm-royale",
   "description": "Rhythm based battle royale game.",
+  "private": true,
   "scripts": {
-    "start": "yarn --cwd backend/ run start",
-    "build": "yarn --cwd frontend/ run build && yarn --cwd backend/ run build",
-    "install": "yarn --cwd frontend/ install --production=false && yarn --cwd backend/ install --production=false"
+    "install": "yarn --cwd common install --production=false && yarn --cwd common build && yarn --cwd backend install --production=false && yarn --cwd frontend install --production=false",
+    "build": "yarn --cwd common build && yarn --cwd frontend build && yarn --cwd backend build",
+    "start": "yarn --cwd backend start",
+    "test": "yarn --cwd common test && yarn --cwd backend test",
+    "dev:server": "yarn --cwd backend dev",
+    "dev:client": "yarn --cwd frontend start"
   },
   "engines": {
-    "node": "17.3.0",
-    "yarn": "1.22.17"
+    "node": ">=18",
+    "yarn": "1.22.x"
   },
   "repository": {
     "type": "git",
