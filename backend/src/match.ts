@@ -12,7 +12,7 @@ import {
   ServerToClientEvents,
   simulateAttempt,
 } from "@rhythm-royale/common";
-import { botName, botSkills } from "./bots";
+import { botName, botSkills, SkillDistribution } from "./bots";
 
 export interface MatchConfig {
   maxPlayers: number;
@@ -24,7 +24,7 @@ export interface MatchConfig {
   graceMs: number;
   /** Fraction of the remaining field knocked out each round. */
   eliminationRate: number;
-  botSkill: [number, number];
+  botSkill: SkillDistribution;
 }
 
 export const DEFAULT_MATCH_CONFIG: MatchConfig = {
@@ -33,7 +33,7 @@ export const DEFAULT_MATCH_CONFIG: MatchConfig = {
   resultsMs: 7000,
   graceMs: 4000,
   eliminationRate: 0.3,
-  botSkill: [0.1, 0.75],
+  botSkill: { mean: 0.4, sd: 0.2 },
 };
 
 type EventName = keyof ServerToClientEvents;

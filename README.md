@@ -35,9 +35,14 @@ modified client can't just claim 100%.
 
 Bots go through the same scoring as people. `simulateAttempt` in `common/src/bots.ts` models
 human-style mistakes: forgotten notes, notes on the wrong subdivision, stray taps and timing
-jitter. These get more likely as phrases get longer. Each lobby gets a spread of bot skill
-levels (`BOT_SKILL_MIN`/`BOT_SKILL_MAX`, default 0.1–0.75). With that spread, a strong player
-wins most games and an average one wins sometimes. Bots are labelled as bots in the results.
+jitter. These get more likely as phrases get longer.
+
+Bot skill follows a bell curve, like a real player base: most bots are middling and a few are
+very strong or very weak (`BOT_SKILL_MEAN` 0.4, `BOT_SKILL_SD` 0.2). Skills are drawn one per
+equal-probability slice of the curve rather than independently, so every lobby has the same
+overall shape instead of occasionally getting three aces or none. With these settings, a
+strong player wins most games and an average one wins sometimes. Bots are labelled as bots in
+the results.
 
 If every human in a match has been knocked out, the bots' remaining rounds are resolved
 instantly instead of making people watch.
@@ -78,8 +83,8 @@ yarn start            # serves the built frontend and the API from one process
 | `PORT`          | 5000    | HTTP port                                       |
 | `MAX_PLAYERS`   | 10      | Seats per battle royale lobby                   |
 | `LOBBY_WAIT_MS` | 15000   | How long a lobby waits for people before bots   |
-| `BOT_SKILL_MIN` | 0.1     | Weakest bot (0–1)                               |
-| `BOT_SKILL_MAX` | 0.75    | Strongest bot (0–1)                             |
+| `BOT_SKILL_MEAN`| 0.4     | Average bot skill (0–1)                         |
+| `BOT_SKILL_SD`  | 0.2     | Spread of bot skill                             |
 
 The frontend talks to the same origin in production. Set `REACT_APP_BACKEND_URL` at build time
 to host it separately.

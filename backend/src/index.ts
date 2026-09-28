@@ -27,10 +27,10 @@ const matchConfig: MatchConfig = {
   ...DEFAULT_MATCH_CONFIG,
   maxPlayers: envNumber("MAX_PLAYERS", DEFAULT_MATCH_CONFIG.maxPlayers),
   lobbyWaitMs: envNumber("LOBBY_WAIT_MS", DEFAULT_MATCH_CONFIG.lobbyWaitMs),
-  botSkill: [
-    envNumber("BOT_SKILL_MIN", DEFAULT_MATCH_CONFIG.botSkill[0]),
-    envNumber("BOT_SKILL_MAX", DEFAULT_MATCH_CONFIG.botSkill[1]),
-  ],
+  botSkill: {
+    mean: envNumber("BOT_SKILL_MEAN", DEFAULT_MATCH_CONFIG.botSkill.mean),
+    sd: envNumber("BOT_SKILL_SD", DEFAULT_MATCH_CONFIG.botSkill.sd),
+  },
 };
 
 const app = express();

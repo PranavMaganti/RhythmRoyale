@@ -29,7 +29,7 @@ export const TEST_CONFIG: MatchConfig = {
   resultsMs: 5000,
   graceMs: 2000,
   eliminationRate: 0.3,
-  botSkill: [0.3, 0.85],
+  botSkill: { mean: 0.55, sd: 0.2 },
 };
 
 export const testRng = (): (() => number) => seededRng("tests");
