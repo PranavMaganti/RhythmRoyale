@@ -1,0 +1,32 @@
+# Fly.io: `fly launch --no-deploy` (keep this file), then
+# `fly secrets set DATABASE_URL=...` and `fly deploy`. See DEPLOY.md.
+app = "rhythm-royale"
+primary_region = "lhr"
+
+[env]
+  PORT = "8080"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  # Matches live in the server's memory, so keep exactly one machine running:
+  # stopping it (or adding a second) would split or end games in progress.
+  auto_stop_machines = "off"
+  auto_start_machines = true
+  min_machines_running = 1
+
+  [http_service.concurrency]
+    type = "connections"
+    soft_limit = 800
+    hard_limit = 1000
+
+  [[http_service.checks]]
+    grace_period = "15s"
+    interval = "30s"
+    method = "GET"
+    path = "/api/health"
+    timeout = "5s"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"

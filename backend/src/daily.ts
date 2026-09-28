@@ -7,25 +7,20 @@ import {
   isDailyKey,
   scoreAttempt,
 } from "@rhythm-royale/common";
+import type { DailyStore } from "./dailyStore.js";
 import { sanitizeName } from "./names.js";
-
-interface Entry {
-  name: string;
-  total: number;
-  scores: number[];
-}
 
 const TOP_N = 10;
 
 /**
- * In-memory daily leaderboard. Scores are recomputed on the server from the raw
- * taps so a modified client can't simply claim 500/500. Swap for a database to
- * survive restarts.
+ * Daily challenge leaderboard. Scores are recomputed on the server from the
+ * raw presses so a modified client can't simply claim 500/500.
  */
 export class DailyBoard {
-  private readonly days = new Map<string, Map<string, Entry>>();
-
-  constructor(private readonly now: () => Date = () => new Date()) {}
+  constructor(
+    private readonly store: DailyStore,
+    private readonly now: () => Date = () => new Date(),
+  ) {}
 
   /** Today, plus yesterday for people who started just before midnight UTC. */
   acceptedDates(): string[] {
@@ -34,7 +29,7 @@ export class DailyBoard {
     return [dailyKey(today), dailyKey(yesterday)];
   }
 
-  submit(body: unknown): DailyStanding | { error: string } {
+  async submit(body: unknown): Promise<DailyStanding | { error: string }> {
     const { date, token, name, attempts } = (body ?? {}) as Record<string, unknown>;
     if (typeof date !== "string" || !isDailyKey(date) || !this.acceptedDates().includes(date)) {
       return { error: "That daily challenge is no longer open." };
@@ -43,53 +38,34 @@ export class DailyBoard {
       return { error: "Missing player token." };
     }
     if (!Array.isArray(attempts) || attempts.length !== DAILY_DIFFICULTIES.length) {
-      return { error: "Expected one attempt per rhythm." };
+      return { error: "Expected one attempt per melody." };
     }
 
-    this.prune();
-    let day = this.days.get(date);
-    if (!day) {
-      day = new Map();
-      this.days.set(date, day);
-    }
+    await this.store.prune(this.acceptedDates());
+    const scores = dailyRhythms(date).map((r, i) => scoreAttempt(r, attempts[i]).score);
     // First attempt counts, like Wordle: resubmitting just returns the original standing.
-    if (!day.has(token)) {
-      const rhythms = dailyRhythms(date);
-      const scores = rhythms.map((r, i) => scoreAttempt(r, attempts[i]).score);
-      day.set(token, {
-        name: sanitizeName(name),
-        scores,
-        total: scores.reduce((a, b) => a + b, 0),
-      });
-    }
-    const entry = day.get(token) as Entry;
-    const all = Array.from(day.values());
-    const lower = all.filter((e) => e.total < entry.total).length;
-    return {
-      ...this.leaderboard(date),
-      total: entry.total,
-      scores: entry.scores,
-      rank: all.filter((e) => e.total > entry.total).length + 1,
-      percentile: all.length > 1 ? Math.round((100 * lower) / (all.length - 1)) : 100,
-    };
-  }
-
-  leaderboard(date: string): DailyLeaderboard {
-    const entries = Array.from(this.days.get(date)?.values() ?? []);
+    const entry = await this.store.addFirst(date, token, {
+      name: sanitizeName(name),
+      scores,
+      total: scores.reduce((a, b) => a + b, 0),
+    });
+    const { players, higher, lower } = await this.store.stats(date, entry.total);
     return {
       date,
-      players: entries.length,
-      top: entries
-        .sort((a, b) => b.total - a.total)
-        .slice(0, TOP_N)
-        .map(({ name, total }) => ({ name, total })),
+      players,
+      top: await this.store.top(date, TOP_N),
+      total: entry.total,
+      scores: entry.scores,
+      rank: higher + 1,
+      percentile: players > 1 ? Math.round((100 * lower) / (players - 1)) : 100,
     };
   }
 
-  private prune(): void {
-    const keep = this.acceptedDates();
-    for (const date of Array.from(this.days.keys())) {
-      if (!keep.includes(date)) this.days.delete(date);
-    }
+  async leaderboard(date: string): Promise<DailyLeaderboard> {
+    const [{ players }, top] = await Promise.all([
+      this.store.stats(date, 0),
+      this.store.top(date, TOP_N),
+    ]);
+    return { date, players, top };
   }
 }

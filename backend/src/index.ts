@@ -13,6 +13,7 @@ import cors from "cors";
 import express from "express";
 import { Server } from "socket.io";
 import { DailyBoard } from "./daily.js";
+import { createDailyStore } from "./dailyStore.js";
 import { Matchmaker } from "./matchmaker.js";
 import { sanitizeName } from "./names.js";
 
@@ -34,7 +35,13 @@ const matchConfig: MatchConfig = {
   },
 };
 
+const store = await createDailyStore();
+console.log(`Daily leaderboard storage: ${store.kind}`);
+const daily = new DailyBoard(store);
+
 const app = express();
+// Hosts like Render and Fly terminate TLS in a proxy in front of the app.
+app.set("trust proxy", 1);
 app.use(cors());
 app.use(express.json({ limit: "100kb" }));
 
@@ -55,8 +62,6 @@ const matchmaker = new Matchmaker(
   matchConfig,
 );
 
-const daily = new DailyBoard();
-
 io.on("connection", (socket) => {
   socket.emit("welcome", { playerId: socket.id });
   socket.on("queue", (name) => matchmaker.join(socket.id, sanitizeName(name)));
@@ -65,22 +70,47 @@ io.on("connection", (socket) => {
   socket.on("disconnect", () => matchmaker.leave(socket.id));
 });
 
-app.get("/api/health", (_req, res) => {
-  res.json({ ok: true, matches: matchmaker.matches.size, players: io.engine.clientsCount });
+// Stays 200 when the database is down: restarting the server wouldn't fix the
+// database, and it would end every match in progress.
+app.get("/api/health", async (_req, res) => {
+  let database: string = store.kind;
+  try {
+    await store.ping();
+  } catch {
+    database = `${store.kind} (unreachable)`;
+  }
+  res.json({
+    ok: true,
+    database,
+    matches: matchmaker.matches.size,
+    players: io.engine.clientsCount,
+  });
 });
 
-app.get("/api/daily/:date", (req, res) => {
+const LEADERBOARD_DOWN = { error: "The leaderboard is unavailable right now." };
+
+app.get("/api/daily/:date", async (req, res) => {
   const date = req.params.date === "today" ? dailyKey() : req.params.date;
   if (!isDailyKey(date)) {
     res.status(400).json({ error: "Invalid date" });
     return;
   }
-  res.json(daily.leaderboard(date));
+  try {
+    res.json(await daily.leaderboard(date));
+  } catch (err) {
+    console.error("Daily leaderboard read failed", err);
+    res.status(503).json(LEADERBOARD_DOWN);
+  }
 });
 
-app.post("/api/daily", (req, res) => {
-  const result = daily.submit(req.body);
-  res.status("error" in result ? 400 : 200).json(result);
+app.post("/api/daily", async (req, res) => {
+  try {
+    const result = await daily.submit(req.body);
+    res.status("error" in result ? 400 : 200).json(result);
+  } catch (err) {
+    console.error("Daily submission failed", err);
+    res.status(503).json(LEADERBOARD_DOWN);
+  }
 });
 
 // Serve the React app in production; client-side routes fall back to index.html.
@@ -95,3 +125,20 @@ if (fs.existsSync(FRONTEND_BUILD)) {
 server.listen(PORT, () => {
   console.log(`Rhythm Royale server listening on ${PORT}`);
 });
+
+// Hosts send SIGTERM before replacing an instance: stop taking connections,
+// close sockets and the database pool, then exit.
+let shuttingDown = false;
+async function shutdown(signal: string): Promise<void> {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  console.log(`${signal} received, shutting down`);
+  const force = setTimeout(() => process.exit(1), 10_000);
+  force.unref();
+  io.close();
+  await new Promise<void>((resolve) => server.close(() => resolve()));
+  await store.close().catch(() => undefined);
+  process.exit(0);
+}
+process.on("SIGTERM", () => void shutdown("SIGTERM"));
+process.on("SIGINT", () => void shutdown("SIGINT"));

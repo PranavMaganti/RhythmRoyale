@@ -116,14 +116,15 @@ with Practice, Daily and Battle Royale against bots that works with no server at
 
 ### Deploying
 
-`render.yaml` is a Render blueprint: in Render choose New > Blueprint and pick this repository.
-Any host that runs Node works: build with `pnpm install && pnpm build`, start with
-`pnpm start`.
+See [DEPLOY.md](DEPLOY.md). In short: Supabase (Postgres) for the daily leaderboard, and the
+game server as a container on Render (`render.yaml`) or Fly.io (`fly.toml`), or anywhere else
+that runs the `Dockerfile`.
 
 ### Server configuration
 
 | Variable         | Default | Meaning                                       |
 | ---------------- | ------- | --------------------------------------------- |
+| `DATABASE_URL`   | unset   | Postgres for the daily leaderboard (memory otherwise) |
 | `PORT`           | 5000    | HTTP port                                     |
 | `MAX_PLAYERS`    | 10      | Seats per battle royale lobby                 |
 | `LOBBY_WAIT_MS`  | 15000   | How long a lobby waits for people before bots |
@@ -133,9 +134,19 @@ Any host that runs Node works: build with `pnpm install && pnpm build`, start wi
 The app talks to its own origin by default. Set `VITE_BACKEND_URL` at build time to host it
 separately from the server.
 
+### Tests against Postgres
+
+The daily leaderboard tests run against the in-memory store, and also against Postgres when
+`TEST_DATABASE_URL` points at a disposable database (CI provides one):
+
+```sh
+docker run -d -p 5433:5432 -e POSTGRES_PASSWORD=test postgres:17-alpine
+TEST_DATABASE_URL=postgres://postgres:test@localhost:5433/postgres pnpm test
+```
+
 ## Known limitations
 
-- Matches and the daily leaderboard live in memory, so a restart clears them and the server
-  can't be scaled horizontally yet. Moving the daily board to Redis or Postgres is the natural
-  next step.
+- Matches live in the server's memory, so the server runs as a single instance and a restart
+  ends matches in progress. Scaling out would need the Socket.IO Redis adapter and shared
+  match state.
 - There are no accounts: the daily leaderboard uses an anonymous per-browser token.

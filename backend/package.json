@@ -13,6 +13,7 @@
     "@rhythm-royale/common": "workspace:*",
     "cors": "^2.8.6",
     "express": "^5.2.1",
+    "postgres": "^3.4.9",
     "socket.io": "^4.8.4"
   },
   "devDependencies": {

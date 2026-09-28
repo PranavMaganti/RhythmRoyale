@@ -1,12 +1,12 @@
-# One-click deploy on Render (https://render.com): New > Blueprint, pick this repo.
+# Render: New > Blueprint, pick this repository, and paste your Supabase
+# connection string when asked for DATABASE_URL. See DEPLOY.md.
 services:
   - type: web
     name: rhythm-royale
-    runtime: node
+    runtime: docker
     plan: free
-    buildCommand: corepack enable && pnpm install --frozen-lockfile && pnpm build
-    startCommand: pnpm start
+    dockerfilePath: ./Dockerfile
     healthCheckPath: /api/health
     envVars:
-      - key: NODE_VERSION
-        value: "24"
+      - key: DATABASE_URL
+        sync: false
