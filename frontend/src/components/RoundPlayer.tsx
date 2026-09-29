@@ -14,7 +14,7 @@ import { type CSSProperties, type ReactNode, useEffect, useRef, useState } from 
 import * as Tone from "tone";
 import { useTapRecorder } from "../hooks/useTapRecorder";
 import { createInstruments, type Instruments } from "../lib/audio";
-import { keyLabel, laneColor, laneKeys } from "../lib/keys";
+import { keyLabel, laneKeys } from "../lib/keys";
 import RhythmLane from "./RhythmLane";
 
 type Phase = "preview" | "listen" | "prepare" | "record" | "done";
@@ -177,13 +177,14 @@ export default function RoundPlayer({ rhythm, onComplete, heading }: Props) {
       {heading && <div className="round-heading">{heading}</div>}
       <h2 className={`round-headline round-headline--${phase}`}>{HEADLINES[phase]}</h2>
       <p className="muted round-hint">{hints[phase]}</p>
-      <div className={`pads pads--${rhythm.pitches}`}>
+      <div className={`pads ${multi ? "pads--bars" : "pads--single"}`}>
         {keys.map((key, lane) => (
           <button
             key={key}
             type="button"
             className={`pad pad--${phase}${isLit(lane) ? " pad--on" : ""}`}
-            style={{ "--lane": laneColor(lane, rhythm.pitches) } as CSSProperties}
+            // Xylophone bars: lower notes are longer, as on the real instrument.
+            style={multi ? ({ "--bar": lane / (rhythm.pitches - 1) } as CSSProperties) : undefined}
             aria-label={`${multi ? `Note ${lane + 1} of ${rhythm.pitches}` : "Tap pad"} (${keyLabel(key)})`}
             tabIndex={-1}
             {...recorder.padHandlers(lane)}

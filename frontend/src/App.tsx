@@ -1,4 +1,5 @@
 import { BrowserRouter, HashRouter, Navigate, Route, Routes } from "react-router";
+import { SketchDefs } from "./components/Sketch";
 import { OFFLINE } from "./config";
 import Daily from "./pages/Daily";
 import Home from "./pages/Home";
@@ -12,6 +13,7 @@ const Router = OFFLINE ? HashRouter : BrowserRouter;
 export default function App() {
   return (
     <Router>
+      <SketchDefs />
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/royale" element={<Royale />} />

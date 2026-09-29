@@ -1,5 +1,4 @@
 import type { Note } from "@rhythm-royale/common";
-import { laneColor } from "../lib/keys";
 
 export interface LaneNote extends Note {
   tone?: "neutral" | "good" | "ok" | "bad" | "missed" | "wrongKey" | "live";
@@ -16,8 +15,8 @@ interface Props {
   playheadMs?: number;
 }
 
-const ROW_PX = 11;
-const PAD_PX = 5;
+const ROW_PX = 12;
+const PAD_PX = 6;
 
 /** A horizontal strip showing notes as bars against beat gridlines. */
 export default function RhythmLane({ notes, pitches, lengthMs, beatMs, label, playheadMs }: Props) {
@@ -35,6 +34,15 @@ export default function RhythmLane({ notes, pitches, lengthMs, beatMs, label, pl
         role="img"
         aria-label={`${label ?? "Rhythm"}: ${notes.length} notes`}
       >
+        {/* Staff lines: one per key, like a percussion staff when there's only one. */}
+        {Array.from({ length: pitches }, (_, row) => (
+          <span
+            // biome-ignore lint/suspicious/noArrayIndexKey: staff lines have no identity beyond position
+            key={`staff-${row}`}
+            className="lane-staff"
+            style={{ top: multi ? PAD_PX + row * ROW_PX + (ROW_PX - 2) / 2 : "50%" }}
+          />
+        ))}
         {Array.from({ length: beats + 1 }, (_, i) => (
           // biome-ignore lint/suspicious/noArrayIndexKey: gridlines have no identity beyond position
           <span key={i} className="lane-beat" style={{ left: pct(i * beatMs) }} />
@@ -51,7 +59,6 @@ export default function RhythmLane({ notes, pitches, lengthMs, beatMs, label, pl
                 left: pct(n.start),
                 width: `max(4px, ${pct(n.duration)})`,
                 ...(multi && { top: PAD_PX + row * ROW_PX, height: ROW_PX - 2, bottom: "auto" }),
-                ...(tone === "live" && { background: laneColor(n.pitch, pitches) }),
               }}
             />
           );

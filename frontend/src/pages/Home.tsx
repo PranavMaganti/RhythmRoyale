@@ -2,6 +2,7 @@ import { DAILY_DIFFICULTIES, dailyKey, dailyNumber } from "@rhythm-royale/common
 import { useState } from "react";
 import { useNavigate } from "react-router";
 import Shell from "../components/Shell";
+import { StaffDoodle } from "../components/Sketch";
 import { OFFLINE } from "../config";
 import { unlockAudio } from "../lib/audio";
 import { load, loadName, saveName } from "../lib/storage";
@@ -25,6 +26,7 @@ export default function Home() {
   return (
     <Shell>
       <section className="hero">
+        <StaffDoodle />
         <h1 className="hero-title">
           Hear it. <span className="accent">Play it.</span> Outlast everyone.
         </h1>
@@ -87,11 +89,13 @@ export default function Home() {
             <strong>Play it back.</strong> After another count-in, hold each note&apos;s key for as
             long as it sounded: <kbd>Space</kbd> for one note, then home-row keys like <kbd>F</kbd>{" "}
             <kbd>J</kbd> up to <kbd>S</kbd> <kbd>D</kbd> <kbd>F</kbd> <kbd>J</kbd> <kbd>K</kbd>{" "}
-            <kbd>L</kbd>. On a phone, tap the coloured pads.
+            <kbd>L</kbd>. On a phone, hold the bars on screen: longer bars are lower notes, like a
+            xylophone.
           </li>
           <li>
-            <strong>Survive.</strong> Timing matters most, note length a little. A steady delay from
-            your headphones or device isn&apos;t held against you.
+            <strong>Survive.</strong> Timing matters most, then pressing the right note, then how
+            long you hold it. A steady delay from your headphones or device isn&apos;t held against
+            you.
           </li>
         </ol>
         <p className="muted small">

@@ -27,13 +27,3 @@ export function laneForKey(key: string, pitches: number): number | null {
 export function keyLabel(key: string): string {
   return key === " " ? "Space" : key.toUpperCase();
 }
-
-/** One colour per lane, low (warm) to high (cool). */
-export const LANE_COLORS = ["#ff6b6b", "#ffa94d", "#ffd43b", "#69db7c", "#4dd4f0", "#b197fc"];
-
-/** Colour for lane `lane` of `pitches`, spread across the palette. */
-export function laneColor(lane: number, pitches: number): string {
-  if (pitches <= 1) return "var(--accent)";
-  const index = Math.round((lane * (LANE_COLORS.length - 1)) / (pitches - 1));
-  return LANE_COLORS[index];
-}
