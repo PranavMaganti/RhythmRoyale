@@ -64,3 +64,87 @@ describe("Matchmaker", () => {
     expect(() => mm.submit("nobody", 1, [])).not.toThrow();
   });
 });
+
+describe("private rooms", () => {
+  test("have a code, a host, and never start on their own", () => {
+    const { mm, log } = setup();
+    const room = mm.createRoom("a", "Alice");
+    expect(room.code).toMatch(/^[A-Z2-9]{5}$/);
+    const lobby = lastPayload<LobbyState>(log, "lobby");
+    expect(lobby.code).toBe(room.code);
+    expect(lobby.hostId).toBe("a");
+    expect(lobby.startsInMs).toBeNull();
+    vi.advanceTimersByTime(TEST_CONFIG.lobbyWaitMs * 10);
+    expect(room.phase).toBe("lobby");
+  });
+
+  test("are joined by code, case-insensitively, and never by quick match", () => {
+    const { mm } = setup();
+    const room = mm.createRoom("a", "Alice");
+    expect(mm.joinRoom("b", room.code?.toLowerCase(), "Bob")).toBe(room);
+    expect(mm.join("c", "Carol")).not.toBe(room);
+    expect(mm.joinRoom("d", "NOPE1", "Dan")).toMatch(/doesn't exist/);
+    expect(mm.joinRoom("d", 42, "Dan")).toMatch(/doesn't exist/);
+  });
+
+  test("only the host starts the game, and bots can be turned off", () => {
+    const { mm, log } = setup();
+    const room = mm.createRoom("a", "Alice");
+    mm.setBots("a", false);
+    expect(lastPayload<LobbyState>(log, "lobby").bots).toBe(false);
+    expect(mm.startRoom("a")).toMatch(/at least one more player/);
+    mm.joinRoom("b", room.code, "Bob");
+    mm.setBots("b", true);
+    expect(room.bots).toBe(false);
+    expect(mm.startRoom("b")).toMatch(/Only the host/);
+    expect(mm.startRoom("a")).toBeNull();
+    expect(room.phase).toBe("round");
+    expect(Array.from(room.players.values()).every((p) => !p.isBot)).toBe(true);
+    expect(mm.joinRoom("c", room.code, "Carol")).toMatch(/already started/);
+  });
+
+  test("with bots on, the host can start alone and bots fill the seats", () => {
+    const { mm } = setup();
+    const room = mm.createRoom("a", "Alice");
+    expect(mm.startRoom("a")).toBeNull();
+    expect(room.players.size).toBe(TEST_CONFIG.maxPlayers);
+  });
+
+  test("hand over to the next player when the host leaves", () => {
+    const { mm, log } = setup();
+    const room = mm.createRoom("a", "Alice");
+    mm.joinRoom("b", room.code, "Bob");
+    mm.leave("a");
+    expect(lastPayload<LobbyState>(log, "lobby").hostId).toBe("b");
+    expect(mm.startRoom("b")).toBeNull();
+  });
+
+  test("reopen with the same code once the game is over", () => {
+    const { mm } = setup();
+    const room = mm.createRoom("a", "Alice");
+    mm.leave("a");
+    expect(room.phase).toBe("finished");
+    const again = mm.joinRoom("b", room.code, "Bob");
+    expect(again).not.toBe(room);
+    expect(typeof again === "string" ? null : again.code).toBe(room.code);
+    expect(typeof again === "string" ? null : again.hostId).toBe("b");
+  });
+
+  test("codes are forgotten an hour after the last game", () => {
+    let now = 0;
+    const log: SentEvent[] = [];
+    const rooms = { joinRoom: vi.fn(), leaveRoom: vi.fn() };
+    const mm = new Matchmaker(
+      (id) => recordingTransport(log, id),
+      rooms,
+      TEST_CONFIG,
+      testRng(),
+      () => now,
+    );
+    const code = mm.createRoom("a", "Alice").code;
+    mm.leave("a");
+    now += 61 * 60 * 1000;
+    mm.createRoom("b", "Bob");
+    expect(mm.joinRoom("c", code, "Carol")).toMatch(/doesn't exist/);
+  });
+});

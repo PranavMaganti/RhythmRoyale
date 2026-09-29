@@ -19,7 +19,13 @@ export interface GameConnection {
   on<E extends keyof Events>(event: E, handler: Handler<E>): void;
   /** Called when the server can't be reached (never for offline games). */
   onError(handler: (message: string | null) => void): void;
+  /** Join the next public lobby. */
   queue(name: string): void;
+  /** Private rooms need the server; offline connections ignore these. */
+  createRoom(name: string): void;
+  joinRoom(code: string, name: string): void;
+  setBots(bots: boolean): void;
+  startRoom(): void;
   submit(...args: Parameters<ClientToServerEvents["submit"]>): void;
   close(): void;
 }
@@ -45,6 +51,16 @@ export function socketConnection(): GameConnection {
       if (!socket.connected) socket.connect();
       socket.emit("queue", name);
     },
+    createRoom: (name) => {
+      if (!socket.connected) socket.connect();
+      socket.emit("create_room", name);
+    },
+    joinRoom: (code, name) => {
+      if (!socket.connected) socket.connect();
+      socket.emit("join_room", { code, name });
+    },
+    setBots: (bots) => socket.emit("room_bots", bots),
+    startRoom: () => socket.emit("start_room"),
     submit: (payload) => socket.emit("submit", payload),
     close: () => {
       socket.removeAllListeners();
@@ -92,6 +108,10 @@ export function localConnection(): GameConnection {
       dispatch("welcome", { playerId: LOCAL_PLAYER_ID });
       current.addHuman(LOCAL_PLAYER_ID, name);
     },
+    createRoom: () => {},
+    joinRoom: () => {},
+    setBots: () => {},
+    startRoom: () => {},
     submit: ({ round, notes }) => match?.submit(LOCAL_PLAYER_ID, round, notes),
     close: () => {
       closed = true;

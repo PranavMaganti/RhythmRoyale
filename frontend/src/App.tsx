@@ -17,6 +17,8 @@ export default function App() {
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/royale" element={<Royale />} />
+        {/* Private room invite links. */}
+        <Route path="/r/:code" element={<Royale />} />
         <Route path="/daily" element={<Daily />} />
         <Route path="/practice" element={<Practice />} />
         <Route path="*" element={<Navigate to="/" replace />} />

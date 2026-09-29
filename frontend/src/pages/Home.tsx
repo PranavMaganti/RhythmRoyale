@@ -42,21 +42,34 @@ export default function Home() {
             placeholder="Your name"
             onChange={(e) => setName(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === "Enter") go("/royale");
+              if (e.key === "Enter") go(OFFLINE ? "/royale" : "/royale?mode=quick");
             }}
           />
         </label>
       </section>
 
       <section className="modes">
-        <button type="button" className="mode mode--primary" onClick={() => go("/royale")}>
-          <span className="mode-title">Battle Royale</span>
+        <button
+          type="button"
+          className="mode mode--primary"
+          onClick={() => go(OFFLINE ? "/royale" : "/royale?mode=quick")}
+        >
+          <span className="mode-title">{OFFLINE ? "Battle Royale" : "Quick match"}</span>
           <span className="mode-desc">
             {OFFLINE
               ? "You against nine bots. Last one standing wins."
-              : "Up to 10 players. Bots fill the empty seats. Last one standing wins."}
+              : "Join a public lobby: up to 10 players, bots fill the empty seats after a short countdown. Last one standing wins."}
           </span>
         </button>
+        {!OFFLINE && (
+          <button type="button" className="mode" onClick={() => go("/royale?mode=private")}>
+            <span className="mode-title">Play with friends</span>
+            <span className="mode-desc">
+              Open a private room, send the invite link, and start when everyone's in. With or
+              without bots.
+            </span>
+          </button>
+        )}
         <button type="button" className="mode" onClick={() => go("/daily")}>
           <span className="mode-title">
             Daily #{dailyNumber(today)}

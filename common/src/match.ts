@@ -71,9 +71,13 @@ export class Match {
   phase: MatchPhase = "lobby";
   round = 0;
   totalRounds = 0;
+  /** Private rooms: who can change settings and start the game. */
+  hostId?: string;
+  /** Whether empty seats get bots when the game starts. */
+  bots = true;
   private rhythm?: Rhythm;
   private timer?: ReturnType<typeof setTimeout>;
-  private readonly startsAt: number;
+  private readonly startsAt: number | null;
 
   constructor(
     readonly id: string,
@@ -82,9 +86,19 @@ export class Match {
     private readonly config: MatchConfig = DEFAULT_MATCH_CONFIG,
     private readonly rng: Rng = Math.random,
     private readonly now: () => number = Date.now,
+    /** Set for a private room: no countdown, and the host starts the game. */
+    readonly code?: string,
   ) {
-    this.startsAt = now() + config.lobbyWaitMs;
-    this.timer = setTimeout(() => this.start(), config.lobbyWaitMs);
+    if (code) {
+      this.startsAt = null;
+    } else {
+      this.startsAt = now() + config.lobbyWaitMs;
+      this.timer = setTimeout(() => this.start(), config.lobbyWaitMs);
+    }
+  }
+
+  get isPrivate(): boolean {
+    return this.code !== undefined;
   }
 
   canJoin(): boolean {
@@ -93,8 +107,33 @@ export class Match {
 
   addHuman(id: string, name: string): void {
     this.players.set(id, { id, name, isBot: false, alive: true, connected: true, skill: 0 });
+    if (this.isPrivate && !this.hostId) this.hostId = id;
     this.broadcastLobby();
-    if (this.players.size >= this.config.maxPlayers) this.start();
+    // A full public lobby has nothing left to wait for; a private one waits for its host.
+    if (!this.isPrivate && this.players.size >= this.config.maxPlayers) this.start();
+  }
+
+  /** Host only: fill empty seats with bots when the game starts, or not. */
+  setBots(by: string, bots: boolean): void {
+    if (this.phase !== "lobby" || by !== this.hostId) return;
+    this.bots = bots;
+    this.broadcastLobby();
+  }
+
+  /** Why the host can't start yet, or null if they can. */
+  startBlocker(): string | null {
+    if (this.bots || this.humans().length >= 2) return null;
+    return "Without bots you need at least one more player.";
+  }
+
+  /** Host only: start a private game. Returns an error message if it can't start. */
+  startBy(id: string): string | null {
+    if (this.phase !== "lobby") return "The game has already started.";
+    if (id !== this.hostId) return "Only the host can start the game.";
+    const blocker = this.startBlocker();
+    if (blocker) return blocker;
+    this.start();
+    return null;
   }
 
   removeHuman(id: string): void {
@@ -103,6 +142,8 @@ export class Match {
 
     if (this.phase === "lobby") {
       this.players.delete(id);
+      // The room carries on with whoever joined next as host.
+      if (this.hostId === id) this.hostId = this.humans()[0]?.id;
       if (this.humans().length === 0) this.dispose();
       else this.broadcastLobby();
       return;
@@ -148,7 +189,7 @@ export class Match {
     if (this.phase !== "lobby") return;
     this.clearTimer();
     const taken = new Set(Array.from(this.players.values(), (p) => p.name));
-    const seats = this.config.maxPlayers - this.players.size;
+    const seats = this.bots ? this.config.maxPlayers - this.players.size : 0;
     botSkills(seats, this.config.botSkill, this.rng).forEach((skill, i) => {
       const name = botName(this.rng, taken);
       taken.add(name);
@@ -288,7 +329,10 @@ export class Match {
       matchId: this.id,
       players: Array.from(this.players.values(), (p) => this.info(p)),
       maxPlayers: this.config.maxPlayers,
-      startsInMs: Math.max(0, this.startsAt - this.now()),
+      startsInMs: this.startsAt === null ? null : Math.max(0, this.startsAt - this.now()),
+      code: this.code,
+      hostId: this.hostId,
+      bots: this.bots,
     });
   }
 

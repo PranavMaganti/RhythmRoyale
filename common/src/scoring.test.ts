@@ -202,3 +202,49 @@ describe("simulateAttempt pitch errors", () => {
     }
   });
 });
+
+describe("early and late notes", () => {
+  // 120 bpm: a beat is 500 ms, so the close window is 200 ms and pairing reaches 450 ms.
+  const rhythm: Rhythm = {
+    bpm: 120,
+    beats: 4,
+    pitches: 1,
+    notes: [
+      { start: 0, duration: 200, pitch: 0 },
+      { start: 1000, duration: 200, pitch: 0 },
+      { start: 2000, duration: 200, pitch: 0 },
+    ],
+  };
+  const shiftSecond = (by: number) =>
+    rhythm.notes.map((n, i) => (i === 1 ? { ...n, start: n.start + by } : n));
+
+  test("a late note that doesn't overlap its target still counts as that note, late", () => {
+    // Starts 300 ms late: after the target (200 ms long) has already ended.
+    const result = scoreAttempt(rhythm, shiftSecond(300));
+    expect(result.misses).toBe(0);
+    expect(result.extras).toBe(0);
+    const second = result.matches.find((m) => m.target === 1);
+    expect(second?.onsetError).toBe(300);
+  });
+
+  test("an early note is reported as early", () => {
+    const result = scoreAttempt(rhythm, shiftSecond(-300));
+    expect(result.matches.find((m) => m.target === 1)?.onsetError).toBe(-300);
+  });
+
+  test("credit falls the further off a note is, and beats not playing it", () => {
+    const score = (by: number) => scoreAttempt(rhythm, shiftSecond(by)).score;
+    const missing = scoreAttempt(rhythm, [rhythm.notes[0], rhythm.notes[2]]).score;
+    expect(score(0)).toBe(100);
+    expect(score(100)).toBeLessThan(score(0));
+    expect(score(300)).toBeLessThan(score(100));
+    expect(score(300)).toBeGreaterThan(missing);
+  });
+
+  test("a press nowhere near any note is still an extra", () => {
+    const stray = [...rhythm.notes, { start: 1500, duration: 100, pitch: 0 }];
+    const result = scoreAttempt(rhythm, stray);
+    expect(result.extras).toBe(1);
+    expect(result.misses).toBe(0);
+  });
+});

@@ -2,6 +2,7 @@ import {
   type AttemptScore,
   beatMs,
   type Note,
+  type NoteMatch,
   padNames,
   type Rhythm,
   rhythmLengthMs,
@@ -9,12 +10,13 @@ import {
   scoreAttempt,
 } from "@rhythm-royale/common";
 
-type Verdict = "good" | "ok" | "off" | "wrongKey" | "missed";
+type Verdict = "good" | "ok" | "early" | "late" | "wrongKey" | "missed";
 
 const MARKS: Record<Verdict, string> = {
   good: "✓",
   ok: "~",
-  off: "!",
+  early: "«",
+  late: "»",
   wrongKey: "✗",
   missed: "?",
 };
@@ -22,11 +24,14 @@ const MARKS: Record<Verdict, string> = {
 /** Timing errors under this don't get a tip; they're within normal tap jitter. */
 const TIMING_TIP_MS = 90;
 
-function verdictFor(credit: number, pitchOk: boolean): Verdict {
-  if (!pitchOk) return "wrongKey";
-  if (credit >= 0.85) return "good";
-  if (credit >= 0.5) return "ok";
-  return "off";
+function verdictFor(m: NoteMatch): Verdict {
+  if (!m.pitchOk) return "wrongKey";
+  if (m.credit >= 0.85) return "good";
+  // Well off the beat says which way; otherwise it was the length that was off.
+  if (m.credit < 0.5 && Math.abs(m.onsetError) > TIMING_TIP_MS) {
+    return m.onsetError > 0 ? "late" : "early";
+  }
+  return "ok";
 }
 
 interface Tip {
@@ -71,7 +76,7 @@ function tipFor(rhythm: Rhythm, attempt: Note[], result: AttemptScore): Tip {
   for (const m of result.matches) {
     const target = rhythm.notes[m.target];
     const played = attempt[m.attempt];
-    const error = played.start - result.offset - target.start;
+    const error = m.onsetError;
     if (Math.abs(error) > Math.abs(worstTiming?.error ?? TIMING_TIP_MS)) {
       worstTiming = { note: m.target, error };
     }
@@ -121,7 +126,7 @@ export default function RhythmCompare({ rhythm, attempt }: { rhythm: Rhythm; att
   const targetVerdicts: Verdict[] = rhythm.notes.map(() => "missed");
   const playedVerdicts: Array<Verdict | "extra"> = played.map(() => "extra");
   for (const m of result.matches) {
-    const v = verdictFor(m.credit, m.pitchOk);
+    const v = verdictFor(m);
     targetVerdicts[m.target] = v;
     playedVerdicts[m.attempt] = v;
   }
@@ -216,6 +221,8 @@ export default function RhythmCompare({ rhythm, attempt }: { rhythm: Rhythm; att
         </li>
         <li>✓ spot on</li>
         <li>~ close</li>
+        <li>« early</li>
+        <li>» late</li>
         {multi && <li>✗ wrong note</li>}
         <li>? missed</li>
         <li>

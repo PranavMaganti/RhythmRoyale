@@ -15,8 +15,17 @@ export interface LobbyState {
   matchId: string;
   players: PlayerInfo[];
   maxPlayers: number;
-  /** Milliseconds until the match starts (empty seats get filled with bots). */
-  startsInMs: number;
+  /**
+   * Public lobbies: milliseconds until the match starts (empty seats get
+   * filled with bots). Private rooms start when the host says, so null.
+   */
+  startsInMs: number | null;
+  /** Set for private rooms: the code in the invite link. */
+  code?: string;
+  /** Private rooms: the player who can change settings and start the game. */
+  hostId?: string;
+  /** Whether empty seats get bots when the game starts. */
+  bots: boolean;
 }
 
 export interface RoundStart {
@@ -64,10 +73,20 @@ export interface ServerToClientEvents {
   submissions: (progress: { submitted: number; waitingFor: number }) => void;
   round_results: (results: RoundResults) => void;
   game_over: (result: GameOver) => void;
+  /** A private-room request failed, e.g. the code doesn't exist or the game has started. */
+  room_error: (message: string) => void;
 }
 
 export interface ClientToServerEvents {
+  /** Join the next public lobby. */
   queue: (name: string) => void;
+  /** Open a private room with you as host. */
+  create_room: (name: string) => void;
+  join_room: (request: { code: string; name: string }) => void;
+  /** Host only: fill empty seats with bots when the game starts, or not. */
+  room_bots: (bots: boolean) => void;
+  /** Host only: start the private game now. */
+  start_room: () => void;
   submit: (payload: SubmitPayload) => void;
   leave: () => void;
 }

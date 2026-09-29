@@ -797,7 +797,8 @@ kbd {
   border: 2px dashed var(--bad);
 }
 .roll-target--wrongKey,
-.roll-target--off {
+.roll-target--early,
+.roll-target--late {
   border-color: var(--bad);
 }
 /* The note the tip talks about. */
@@ -809,6 +810,7 @@ kbd {
 }
 .roll-mark {
   position: absolute;
+  z-index: 1;
   right: -0.35rem;
   top: -0.95rem;
   font-family: var(--font-body);
@@ -825,7 +827,8 @@ kbd {
 .roll-target--ok .roll-mark {
   color: var(--ok);
 }
-.roll-target--off .roll-mark,
+.roll-target--early .roll-mark,
+.roll-target--late .roll-mark,
 .roll-target--wrongKey .roll-mark,
 .roll-target--missed .roll-mark {
   color: var(--bad);
@@ -841,7 +844,8 @@ kbd {
 .roll-played--ok {
   background: var(--ok);
 }
-.roll-played--off,
+.roll-played--early,
+.roll-played--late,
 .roll-played--wrongKey {
   background: var(--bad);
 }
@@ -1021,4 +1025,78 @@ kbd {
   .btn {
     transition: none;
   }
+}
+
+/* Private rooms */
+.room-code {
+  font-size: 3.2rem;
+  letter-spacing: 0.12em;
+  margin: 0.1rem 0 0.75rem;
+}
+.invite {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  align-items: center;
+}
+.invite-link {
+  font: inherit;
+  font-size: 1rem;
+  width: 100%;
+  max-width: 24rem;
+  text-align: center;
+  color: var(--ink-soft);
+  background: var(--wash);
+  border: 0;
+  border-radius: var(--wobble-b);
+  padding: 0.45rem 0.75rem;
+}
+.invite-actions {
+  margin-bottom: 0.75rem;
+  display: flex;
+  gap: 0.5rem;
+  justify-content: center;
+}
+.chips legend {
+  width: 100%;
+  text-align: center;
+  margin-bottom: 0.4rem;
+}
+.chip--wide {
+  --shape: var(--wobble-b);
+  width: auto;
+  height: auto;
+  padding: 0.35rem 1rem;
+  font-size: 1.1rem;
+}
+.room-controls {
+  align-items: center;
+}
+.room-controls .chips {
+  margin-bottom: 0;
+}
+.room-controls p {
+  margin: 0;
+}
+.room-controls .btn {
+  min-width: 12rem;
+}
+.btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.host-mark {
+  color: var(--ok);
+}
+.choice-note {
+  margin: -0.5rem 0 0.25rem;
+}
+.link-button {
+  font: inherit;
+  color: var(--ink);
+  background: none;
+  border: 0;
+  padding: 0;
+  text-decoration: underline;
+  cursor: pointer;
 }

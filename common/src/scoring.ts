@@ -8,6 +8,15 @@ const ONSET_WEIGHT = 0.75;
 const DURATION_WEIGHT = 1 - ONSET_WEIGHT;
 /** Share of a note's credit kept when the timing is right but the key is wrong. */
 export const WRONG_PITCH_CREDIT = 0.3;
+/**
+ * Within this many beats of a target a press earns most of the timing credit.
+ * Further out, up to MATCH_WINDOW_BEATS, it still counts as that note played
+ * early or late (with a little credit) rather than a miss plus an extra note.
+ */
+const CLOSE_WINDOW_BEATS = 0.4;
+const MATCH_WINDOW_BEATS = 0.9;
+/** Onset credit at the edge of the close window. */
+const CLOSE_EDGE_CREDIT = 0.2;
 /** Largest constant offset we forgive (covers audio/input latency and a nervous start). */
 const MAX_OFFSET_BEATS = 1.5;
 
@@ -18,6 +27,8 @@ export interface NoteMatch {
   credit: number;
   /** Whether the right key was pressed. */
   pitchOk: boolean;
+  /** How far the press started from the note, after lining up: + is late. */
+  onsetError: number;
 }
 
 export interface AttemptScore {
@@ -57,15 +68,31 @@ export function sanitizeNotes(notes: unknown, maxNotes = 64): Note[] {
     .sort((a, b) => a.start - b.start);
 }
 
-function noteCredit(target: Note, attempt: Note, window: number): number {
-  const onsetErr = Math.abs(target.start - attempt.start);
-  if (onsetErr >= window) return 0;
-  const onset = clamp01(1 - Math.max(0, onsetErr - PERFECT_ONSET_MS) / (window - PERFECT_ONSET_MS));
+interface Windows {
+  close: number;
+  match: number;
+}
+
+/** Full credit for jitter, falling across the close window, then a thin tail. */
+function onsetCredit(error: number, { close, match }: Windows): number {
+  if (error >= match) return 0;
+  if (error <= PERFECT_ONSET_MS) return 1;
+  if (error <= close) {
+    return 1 - (1 - CLOSE_EDGE_CREDIT) * ((error - PERFECT_ONSET_MS) / (close - PERFECT_ONSET_MS));
+  }
+  return CLOSE_EDGE_CREDIT * ((match - error) / (match - close));
+}
+
+function noteCredit(target: Note, attempt: Note, windows: Windows): number {
+  const onset = onsetCredit(Math.abs(target.start - attempt.start), windows);
+  if (onset <= 0) return 0;
   const durErr = Math.abs(target.duration - attempt.duration);
   const duration = clamp01(
     1 - Math.max(0, durErr - PERFECT_DURATION_MS) / Math.max(target.duration, 150),
   );
-  const timing = ONSET_WEIGHT * onset + DURATION_WEIGHT * duration;
+  // A press well off the beat shouldn't earn much just for being the right length.
+  const durationShare = Math.min(1, onset / CLOSE_EDGE_CREDIT);
+  const timing = ONSET_WEIGHT * onset + DURATION_WEIGHT * duration * durationShare;
   return target.pitch === attempt.pitch ? timing : timing * WRONG_PITCH_CREDIT;
 }
 
@@ -76,14 +103,14 @@ function noteCredit(target: Note, attempt: Note, window: number): number {
 function align(
   target: Note[],
   attempt: Note[],
-  window: number,
+  windows: Windows,
 ): { total: number; matches: NoteMatch[] } {
   const n = target.length;
   const m = attempt.length;
   const dp: number[][] = Array.from({ length: n + 1 }, () => new Array(m + 1).fill(0));
   for (let i = 1; i <= n; i++) {
     for (let j = 1; j <= m; j++) {
-      const c = noteCredit(target[i - 1], attempt[j - 1], window);
+      const c = noteCredit(target[i - 1], attempt[j - 1], windows);
       dp[i][j] = Math.max(dp[i - 1][j], dp[i][j - 1], c > 0 ? dp[i - 1][j - 1] + c : 0);
     }
   }
@@ -92,13 +119,14 @@ function align(
   let i = n;
   let j = m;
   while (i > 0 && j > 0) {
-    const c = noteCredit(target[i - 1], attempt[j - 1], window);
+    const c = noteCredit(target[i - 1], attempt[j - 1], windows);
     if (c > 0 && dp[i][j] === dp[i - 1][j - 1] + c) {
       matches.push({
         target: i - 1,
         attempt: j - 1,
         credit: c,
         pitchOk: target[i - 1].pitch === attempt[j - 1].pitch,
+        onsetError: attempt[j - 1].start - target[i - 1].start,
       });
       i--;
       j--;
@@ -126,7 +154,7 @@ export function scoreAttempt(rhythm: Rhythm, rawAttempt: Note[]): AttemptScore {
   if (target.length === 0 || attempt.length === 0) return empty;
 
   const beat = beatMs(rhythm.bpm);
-  const window = beat * 0.4;
+  const windows = { close: beat * CLOSE_WINDOW_BEATS, match: beat * MATCH_WINDOW_BEATS };
 
   // Players only need to get the *relative* timing right, so try lining up
   // each of the first couple of taps with each of the first couple of notes.
@@ -142,7 +170,7 @@ export function scoreAttempt(rhythm: Rhythm, rawAttempt: Note[]): AttemptScore {
   let bestTotal = -1;
   offsets.forEach((offset) => {
     const shifted = attempt.map((n) => ({ ...n, start: n.start - offset }));
-    const { total, matches } = align(target, shifted, window);
+    const { total, matches } = align(target, shifted, windows);
     if (total > bestTotal) {
       bestTotal = total;
       best = {

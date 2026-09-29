@@ -65,6 +65,16 @@ const matchmaker = new Matchmaker(
 io.on("connection", (socket) => {
   socket.emit("welcome", { playerId: socket.id });
   socket.on("queue", (name) => matchmaker.join(socket.id, sanitizeName(name)));
+  socket.on("create_room", (name) => matchmaker.createRoom(socket.id, sanitizeName(name)));
+  socket.on("join_room", (request) => {
+    const result = matchmaker.joinRoom(socket.id, request?.code, sanitizeName(request?.name));
+    if (typeof result === "string") socket.emit("room_error", result);
+  });
+  socket.on("room_bots", (bots) => matchmaker.setBots(socket.id, bots));
+  socket.on("start_room", () => {
+    const error = matchmaker.startRoom(socket.id);
+    if (error) socket.emit("room_error", error);
+  });
   socket.on("submit", (payload) => matchmaker.submit(socket.id, payload?.round, payload?.notes));
   socket.on("leave", () => matchmaker.leave(socket.id));
   socket.on("disconnect", () => matchmaker.leave(socket.id));

@@ -8,6 +8,10 @@ Hear a melody, play it back, outlast everyone. Originally an ICHACK 2022 submiss
   is full) any empty seats are filled with bots and the first melody plays. Everyone hears the
   same phrase, plays it back, and the least accurate ~30% are knocked out until one player is
   left. Knocked-out players can keep watching or requeue straight away.
+- **Private rooms**: open a room and share its invite link (`/r/<code>`). There's no countdown;
+  the host starts when everyone's in and chooses whether empty seats get bots. With bots off
+  you need at least two people. After a game, "Play again" reopens the same room, so the link
+  keeps working (codes expire an hour after the last game).
 - **Daily challenge**: five melodies per day, the same for everyone (seeded from the UTC date),
   easiest first, one attempt each. You get an emoji result card to share, a streak, and a
   percentile against everyone else who played that day.
