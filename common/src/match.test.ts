@@ -119,7 +119,7 @@ describe("Match rounds", () => {
     expect(rounds).toBe(4);
     const starts = log.filter((e) => e.event === "round_start").map((e) => e.payload as RoundStart);
     expect(starts.map((r) => r.totalRounds)).toEqual([4, 4, 4, 4]);
-    expect(starts[3].rhythm.pitches).toBe(6);
+    expect(starts[3].rhythm.pitches).toBe(4);
   });
 
   test("results are sorted and eliminate the bottom of the field", () => {

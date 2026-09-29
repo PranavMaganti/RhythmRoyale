@@ -142,8 +142,8 @@ export default function Royale() {
           <h1>Battle Royale</h1>
           <p className="muted">
             {conn.offline
-              ? "You against nine bots, right here in your browser. Each round adds a note to choose from; the final round uses six."
-              : "Join a lobby. When it fills up, or after a short wait, bots take the empty seats and the first melody plays. Each round adds a note to choose from; the final round uses six."}
+              ? "You against nine bots, right here in your browser. The tunes use more notes each round, up to four."
+              : "Join a lobby. When it fills up, or after a short wait, bots take the empty seats and the first melody plays. The tunes use more notes each round, up to four."}
           </p>
           <form
             className="stack"

@@ -32,7 +32,7 @@ export default function Home() {
         </h1>
         <p className="muted hero-sub">
           Each round plays a short melody. Play it back as precisely as you can. The least accurate
-          players are knocked out, and every round adds another note to choose from, up to six.
+          players are knocked out, and the tunes use more notes each round, up to four.
         </p>
         <label className="field">
           <span>Nickname</span>
@@ -87,10 +87,9 @@ export default function Home() {
           </li>
           <li>
             <strong>Play it back.</strong> After another count-in, hold each note&apos;s key for as
-            long as it sounded: <kbd>Space</kbd> for one note, then home-row keys like <kbd>F</kbd>{" "}
-            <kbd>J</kbd> up to <kbd>S</kbd> <kbd>D</kbd> <kbd>F</kbd> <kbd>J</kbd> <kbd>K</kbd>{" "}
-            <kbd>L</kbd>. On a phone, hold the bars on screen: longer bars are lower notes, like a
-            xylophone.
+            long as it sounded. On a phone, hold the pads with your thumbs: do, re, mi and sol, low
+            to high. On a keyboard, use <kbd>Space</kbd> for one note, then <kbd>D</kbd>{" "}
+            <kbd>F</kbd> <kbd>J</kbd> <kbd>K</kbd>.
           </li>
           <li>
             <strong>Survive.</strong> Timing matters most, then pressing the right note, then how

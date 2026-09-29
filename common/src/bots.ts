@@ -1,5 +1,5 @@
 import { gaussian, type Rng } from "./random.js";
-import { beatMs, type Note, type Rhythm } from "./rhythm.js";
+import { beatMs, type Note, pitchesUsed, type Rhythm } from "./rhythm.js";
 
 /**
  * Imitate a human attempt at a rhythm. `skill` runs from 0 (flailing) to 1
@@ -15,7 +15,8 @@ export function simulateAttempt(rhythm: Rhythm, skill: number, rng: Rng = Math.r
   const misplaceChance = weakness * 0.18 * memoryLoad;
   const extraChance = weakness * 0.05 * memoryLoad;
   // More keys to choose from means more chances to pick the wrong one.
-  const wrongPitchChance = weakness * 0.45 * (1 - 1 / rhythm.pitches) * Math.min(2, memoryLoad);
+  const wrongPitchChance =
+    weakness * 0.45 * (1 - 1 / pitchesUsed(rhythm)) * Math.min(2, memoryLoad);
   const onsetSd = 10 + weakness * beat * 0.12;
   const durationSd = 0.05 + weakness * 0.35;
   // A consistent reaction delay; scoring forgives this, as it does for players.

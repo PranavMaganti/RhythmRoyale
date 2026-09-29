@@ -298,8 +298,8 @@ export default function Daily() {
         <p className="muted">Daily challenge</p>
         <h1>#{dailyNumber(key)}</h1>
         <p className="muted">
-          Five melodies, the same for everyone today, each harder than the last, ending with all six
-          notes. You get <strong>one attempt</strong> at each, so make it count.
+          Five melodies, the same for everyone today, each harder than the last, ending with all
+          four notes. You get <strong>one attempt</strong> at each, so make it count.
         </p>
         {emojiRow}
         <label className="field">

@@ -1,14 +1,7 @@
-/**
- * Home-row layouts, with the thumb on Space in the middle for odd counts.
- * Index 0 is the lowest pitch.
- */
+/** Home-row layouts. Index 0 is the lowest pitch. */
 const LAYOUTS: Record<number, string[]> = {
   1: [" "],
-  2: ["f", "j"],
-  3: ["f", " ", "j"],
   4: ["d", "f", "j", "k"],
-  5: ["d", "f", " ", "j", "k"],
-  6: ["s", "d", "f", "j", "k", "l"],
 };
 
 export function laneKeys(pitches: number): string[] {
@@ -26,4 +19,9 @@ export function laneForKey(key: string, pitches: number): number | null {
 
 export function keyLabel(key: string): string {
   return key === " " ? "Space" : key.toUpperCase();
+}
+
+/** Phones and tablets: play with thumbs on the pads, and don't mention keys. */
+export function isTouchDevice(): boolean {
+  return typeof window !== "undefined" && window.matchMedia("(hover: none)").matches;
 }

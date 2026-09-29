@@ -16,28 +16,26 @@ Hear a melody, play it back, outlast everyone. Originally an ICHACK 2022 submiss
 If the server can't be reached, the Battle Royale screen offers to play offline: the same match
 engine runs in the browser against bots.
 
-### Pitches
+### Melodies
 
-Each difficulty level adds a note to choose from, from a single tone at level 1 up to six at
-level 6, while the rhythms get harder more slowly. A royale plans its rounds when it starts and
-spreads the levels across them, so the first round is always one note and the final round
-always uses all six.
+Level 1 is rhythm only, on a single pad. From level 2 there are always four pads (do, re, mi and
+sol: C D E G), so thumbs can learn where each one is, and each level's tunes use more of them:
+do and sol at level 2, then do, mi and sol, then all four. After that the rhythms get busier. A
+royale plans its rounds when it starts and spreads the levels across them, so the first round is
+always one note and the final round always uses all four.
 
-The notes come from a major pentatonic scale (C D E G A C), so any combination sounds musical
-and there are no semitone steps to confuse. When there are only a few notes they sit further
-apart (two notes are an octave apart). Keys follow the home row, with the thumb on Space in the
-middle:
+Tunes are generated, but built the way real ones are:
 
-| Notes | Keys          |
-| ----- | ------------- |
-| 1     | Space         |
-| 2     | F J           |
-| 3     | F Space J     |
-| 4     | D F J K       |
-| 5     | D F Space J K |
-| 6     | S D F J K L   |
+- **Rhythmic figures.** Phrases are strung together from common figures (quarter notes, pairs
+  of eighths, dotted rhythms, syncopation, sixteenth runs at the top levels) rather than random
+  lengths, with at most one rest per bar.
+- **Call and answer.** Two-bar tunes open both bars with the same figure. The first bar ends
+  away from home, like a question; the second echoes it, exactly or a step lower, and resolves.
+- **Stepwise motion.** Notes mostly move to a neighbour, sometimes repeat or skip one, and every
+  tune ends on do.
 
-On touch screens each note gets its own coloured pad.
+Keys are D F J K, or Space when there is one pad. On touch screens the pads fill the bottom of
+the screen.
 
 ### A round
 

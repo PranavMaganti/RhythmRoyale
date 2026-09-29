@@ -39,7 +39,7 @@ export default function Practice() {
           type="button"
           key={level}
           aria-pressed={difficulty === level}
-          title={`${DIFFICULTIES[level - 1].pitches} note${DIFFICULTIES[level - 1].pitches === 1 ? "" : "s"}`}
+          title={`${DIFFICULTIES[level - 1].lanes.length} note${DIFFICULTIES[level - 1].lanes.length === 1 ? "" : "s"}`}
           className={`chip${difficulty === level ? " chip--on" : ""}`}
           onClick={() => pickLevel(level)}
         >
@@ -56,12 +56,7 @@ export default function Practice() {
           key={run}
           rhythm={rhythm}
           onComplete={setAttempt}
-          heading={
-            <>
-              Practice · level {difficulty} · {rhythm.pitches} note
-              {rhythm.pitches === 1 ? "" : "s"}
-            </>
-          }
+          heading={<>Practice · level {difficulty}</>}
         />
       </Shell>
     );
@@ -73,9 +68,7 @@ export default function Practice() {
       <Shell wide>
         <section className="results">
           <div className={`result-banner ${score >= 85 ? "result-banner--safe" : ""}`}>
-            <p className="muted">
-              Practice · level {difficulty} · {rhythm.pitches} note{rhythm.pitches === 1 ? "" : "s"}
-            </p>
+            <p className="muted">Practice · level {difficulty}</p>
             <h1>{score}%</h1>
           </div>
           <RhythmCompare rhythm={rhythm} attempt={attempt} />
@@ -105,9 +98,9 @@ export default function Practice() {
       <section className="card center">
         <h1>Practice</h1>
         <p className="muted">
-          No pressure. Each level adds a note to choose from: level 1 is a few slow taps on one
-          note; level {MAX_DIFFICULTY} is quick phrases across all six, like the final round of a
-          royale.
+          No pressure. Level 1 is a few slow taps on one note. Then come short tunes on four pads,
+          using more of them each level; level {MAX_DIFFICULTY} is quick phrases like the final
+          round of a royale.
         </p>
         {levels}
         <button

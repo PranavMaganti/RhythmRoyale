@@ -3,6 +3,7 @@ import {
   COUNT_IN_BEATS,
   LEAD_IN_MS,
   type Note,
+  padNames,
   pitchNames,
   REFERENCE_NOTE_MS,
   REFERENCE_STEP_MS,
@@ -10,11 +11,11 @@ import {
   referenceMs,
   rhythmLengthMs,
 } from "@rhythm-royale/common";
-import { type CSSProperties, type ReactNode, useEffect, useRef, useState } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 import * as Tone from "tone";
 import { useTapRecorder } from "../hooks/useTapRecorder";
 import { createInstruments, type Instruments } from "../lib/audio";
-import { keyLabel, laneKeys } from "../lib/keys";
+import { isTouchDevice, keyLabel, laneKeys } from "../lib/keys";
 import RhythmLane from "./RhythmLane";
 
 type Phase = "preview" | "listen" | "prepare" | "record" | "done";
@@ -57,7 +58,11 @@ export default function RoundPlayer({ rhythm, onComplete, heading }: Props) {
     enabled: recording,
     pitches: rhythm.pitches,
     earlyToleranceMs: beat / 2,
-    onPress: (lane) => instruments.current?.echo.triggerAttack(names[lane]),
+    onPress: (lane) => {
+      instruments.current?.echo.triggerAttack(names[lane]);
+      // A tiny buzz confirms the press on phones that support it (not iOS).
+      navigator.vibrate?.(8);
+    },
     onRelease: (lane) => instruments.current?.echo.triggerRelease(names[lane]),
   });
   const { arm, finish } = recorder;
@@ -155,16 +160,22 @@ export default function RoundPlayer({ rhythm, onComplete, heading }: Props) {
   }, [rhythm, arm, finish]);
 
   const keys = laneKeys(rhythm.pitches);
+  const labels = padNames(rhythm.pitches);
+  const touch = isTouchDevice();
   const keyList = keys.map(keyLabel).join(" ");
   const hints: Record<Phase, string> = {
-    preview: `This round uses ${rhythm.pitches} notes, low to high: ${keyList}.`,
+    preview: touch
+      ? "Here are your four notes, low to high."
+      : `Here are your four notes, low to high: ${keyList}.`,
     listen: multi
-      ? "Memorise the melody: which note, when, and for how long."
+      ? "Memorise the tune: which note, when, and for how long."
       : "Memorise the rhythm: one tone per press, held for as long as it sounds.",
     prepare: "Get ready to play it back.",
-    record: multi
-      ? `Hold ${keyList} (or tap the pads) for each note.`
-      : "Hold SPACE or the pad for each note.",
+    record: touch
+      ? `Hold ${multi ? "a pad" : "the pad"} for each note, as long as it sounded.`
+      : multi
+        ? `Hold ${keyList} (or tap the pads) for each note.`
+        : "Hold SPACE or the pad for each note.",
     done: "Scoring…",
   };
 
@@ -174,27 +185,12 @@ export default function RoundPlayer({ rhythm, onComplete, heading }: Props) {
 
   return (
     <div className="round">
-      {heading && <div className="round-heading">{heading}</div>}
-      <h2 className={`round-headline round-headline--${phase}`}>{HEADLINES[phase]}</h2>
-      <p className="muted round-hint">{hints[phase]}</p>
-      <div className={`pads ${multi ? "pads--bars" : "pads--single"}`}>
-        {keys.map((key, lane) => (
-          <button
-            key={key}
-            type="button"
-            className={`pad pad--${phase}${isLit(lane) ? " pad--on" : ""}`}
-            // Xylophone bars: lower notes are longer, as on the real instrument.
-            style={multi ? ({ "--bar": lane / (rhythm.pitches - 1) } as CSSProperties) : undefined}
-            aria-label={`${multi ? `Note ${lane + 1} of ${rhythm.pitches}` : "Tap pad"} (${keyLabel(key)})`}
-            tabIndex={-1}
-            {...recorder.padHandlers(lane)}
-          >
-            {!multi && <span className="pad-count">{count ?? ""}</span>}
-            {multi && <span className="pad-key">{keyLabel(key)}</span>}
-          </button>
-        ))}
+      <div className="round-top">
+        {heading && <div className="round-heading">{heading}</div>}
+        <h2 className={`round-headline round-headline--${phase}`}>{HEADLINES[phase]}</h2>
+        <p className="muted round-hint">{hints[phase]}</p>
+        {multi && <p className="count-line">{count ?? " "}</p>}
       </div>
-      {multi && <p className="count-line">{count ?? " "}</p>}
       <RhythmLane
         label={recording ? "You" : undefined}
         notes={recorder.notes.map((n) => ({ ...n, tone: "live" }))}
@@ -203,6 +199,26 @@ export default function RoundPlayer({ rhythm, onComplete, heading }: Props) {
         beatMs={beat}
         playheadMs={phase === "record" ? playhead : undefined}
       />
+      <div className={`pads ${multi ? "pads--bars" : "pads--single"}`}>
+        {keys.map((key, lane) => (
+          <button
+            key={key}
+            type="button"
+            className={`pad pad--${phase}${isLit(lane) ? " pad--on" : ""}`}
+            aria-label={`${multi ? `${labels[lane]}, note ${lane + 1} of ${rhythm.pitches}` : "Tap pad"} (${keyLabel(key)})`}
+            tabIndex={-1}
+            {...recorder.padHandlers(lane)}
+          >
+            {!multi && <span className="pad-count">{count ?? ""}</span>}
+            {multi && (
+              <span className="pad-label">
+                <span className="pad-name">{labels[lane]}</span>
+                {!touch && <span className="pad-key">{keyLabel(key)}</span>}
+              </span>
+            )}
+          </button>
+        ))}
+      </div>
     </div>
   );
 }

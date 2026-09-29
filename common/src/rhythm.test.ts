@@ -6,6 +6,8 @@ import {
   generateRhythm,
   MAX_DIFFICULTY,
   MAX_PITCHES,
+  padNames,
+  pitchesUsed,
   pitchNames,
   referenceMs,
   rhythmLengthMs,
@@ -22,7 +24,7 @@ describe("generateRhythm", () => {
         const length = rhythmLengthMs(rhythm);
         expect(rhythm.notes.length).toBeGreaterThanOrEqual(3);
         expect(rhythm.notes[0].start).toBe(0);
-        expect(rhythm.pitches).toBe(DIFFICULTIES[difficulty - 1].pitches);
+        expect(rhythm.pitches).toBe(DIFFICULTIES[difficulty - 1].pads);
         rhythm.notes.forEach((note, j) => {
           expect(Number.isInteger(note.pitch)).toBe(true);
           expect(note.pitch).toBeGreaterThanOrEqual(0);
@@ -66,27 +68,51 @@ describe("timing", () => {
 });
 
 describe("pitches", () => {
-  test("each level adds a key, up to six", () => {
-    expect(DIFFICULTIES.map((d) => d.pitches)).toEqual([1, 2, 3, 4, 5, 6]);
-    expect(MAX_PITCHES).toBe(6);
+  test("level 1 is one pad; after that four pads, with melodies using more of them", () => {
+    expect(DIFFICULTIES.map((d) => d.pads)).toEqual([1, 4, 4, 4, 4, 4]);
+    expect(DIFFICULTIES.map((d) => d.lanes.length)).toEqual([1, 2, 3, 4, 4, 4]);
+    expect(MAX_PITCHES).toBe(4);
   });
 
-  test("multi-key rhythms actually use several keys", () => {
+  test("melodies only use their level's pads and use several of them", () => {
     const rng = seededRng("spread");
     for (let level = 2; level <= MAX_DIFFICULTY; level++) {
+      const { lanes } = DIFFICULTIES[level - 1];
       for (let i = 0; i < 100; i++) {
         const r = generateRhythm(level, rng);
-        expect(new Set(r.notes.map((n) => n.pitch)).size).toBeGreaterThanOrEqual(2);
+        for (const n of r.notes) expect(lanes).toContain(n.pitch);
+        expect(pitchesUsed(r)).toBeGreaterThanOrEqual(Math.min(lanes.length, 3));
       }
     }
   });
 
-  test("key pitches rise from low to high and spread out when there are few", () => {
+  test("melodies end on the home note", () => {
+    const rng = seededRng("home");
+    for (let level = 2; level <= MAX_DIFFICULTY; level++) {
+      for (let i = 0; i < 100; i++) {
+        const r = generateRhythm(level, rng);
+        expect(r.notes[r.notes.length - 1].pitch).toBe(0);
+      }
+    }
+  });
+
+  test("two-bar phrases open both bars with the same figure", () => {
+    const rng = seededRng("echo");
+    for (let i = 0; i < 100; i++) {
+      const r = generateRhythm(4, rng);
+      const bar = 4 * beatMs(r.bpm);
+      const firstBeats = (from: number) =>
+        r.notes
+          .filter((n) => n.start >= from && n.start < from + bar / 4)
+          .map((n) => n.start - from);
+      expect(firstBeats(bar)).toEqual(firstBeats(0));
+    }
+  });
+
+  test("pads rise from low to high", () => {
     expect(pitchNames(1)).toEqual(["G4"]);
-    expect(pitchNames(2)).toEqual(["C4", "C5"]);
-    expect(pitchNames(3)).toEqual(["C4", "G4", "C5"]);
-    expect(pitchNames(6)).toEqual(["C4", "D4", "E4", "G4", "A4", "C5"]);
-    for (let n = 1; n <= 6; n++) expect(new Set(pitchNames(n)).size).toBe(n);
+    expect(pitchNames(4)).toEqual(["C4", "D4", "E4", "G4"]);
+    expect(padNames(4)).toEqual(["do", "re", "mi", "sol"]);
   });
 
   test("the pitch preview only plays when there is more than one key", () => {
