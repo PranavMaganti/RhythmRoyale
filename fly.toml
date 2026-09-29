@@ -3,8 +3,8 @@
 #
 #   fly launch --no-deploy --copy-config --name <your-app-name>
 #   fly volumes create rhythm_data --size 1 --region lhr
-#   fly deploy
-app = "rhythm-royale"
+#   fly deploy --ha=false   # one machine; a second would split matches
+app = "rhythmroyale"
 primary_region = "lhr"
 
 [env]

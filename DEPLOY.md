@@ -32,7 +32,7 @@ account.
 fly auth login
 fly launch --no-deploy --copy-config --name <your-app-name>   # keeps fly.toml
 fly volumes create rhythm_data --size 1 --region lhr           # same region as fly.toml
-fly deploy
+fly deploy --ha=false                                          # exactly one machine
 ```
 
 The game is then live at `https://<your-app-name>.fly.dev`.
