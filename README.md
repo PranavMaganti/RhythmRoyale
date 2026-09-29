@@ -117,7 +117,7 @@ with Practice, Daily and Battle Royale against bots that works with no server at
 ### Deploying
 
 See [DEPLOY.md](DEPLOY.md). Everything runs on one platform: Fly.io (`fly.toml`: the server
-plus Fly Managed Postgres for the leaderboard) or Render (`render.yaml`: the server plus Render
+plus a volume holding a SQLite leaderboard) or Render (`render.yaml`: the server plus Render
 Postgres), or anywhere else that runs the `Dockerfile`.
 
 ### Server configuration

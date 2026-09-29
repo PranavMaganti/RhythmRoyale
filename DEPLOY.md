@@ -6,7 +6,7 @@ to live, and everything can sit on a single platform:
 
 | Option                    | What you get                                                        | Best for                      |
 | ------------------------- | ------------------------------------------------------------------- | ----------------------------- |
-| **Fly.io** (recommended)  | One always-on machine plus a Fly Managed Postgres cluster for the leaderboard | Launch: managed backups, near your players |
+| **Fly.io** (recommended)  | One always-on machine plus a 1 GB volume; the leaderboard is a SQLite file on the volume | Launch: simple, cheap, near your players |
 | **Render**                | One Blueprint creates the server and a Render Postgres database     | Trying it out with no command line |
 
 Both use the `Dockerfile`. The server picks its storage from `DATABASE_URL`:
@@ -31,22 +31,20 @@ account.
 ```sh
 fly auth login
 fly launch --no-deploy --copy-config --name <your-app-name>   # keeps fly.toml
-fly mpg create --region lhr                                    # same region as fly.toml
-fly mpg attach <cluster-id> -a <your-app-name>                 # sets DATABASE_URL
+fly volumes create rhythm_data --size 1 --region lhr           # same region as fly.toml
 fly deploy
 ```
 
 The game is then live at `https://<your-app-name>.fly.dev`.
 
-- `fly mpg attach` stores the connection string as the `DATABASE_URL` secret.
-  The server creates its table on first start.
+- `fly.toml` mounts the volume at `/data` and sets
+  `DATABASE_URL=file:/data/rhythm-royale.db`. The file survives deploys and
+  restarts.
 - Set `primary_region` in `fly.toml` (and the `--region` above) near your
   players. `lhr` is London.
-- Fly Managed Postgres handles backups; see `fly mpg --help`.
+- Back up the leaderboard with `fly volumes snapshots list`. Fly snapshots
+  volumes daily.
 - Deploy again after changes with `fly deploy`.
-- To use SQLite on a volume instead, create a volume, add a `[mounts]` section
-  with `destination = "/data"` to `fly.toml`, and set
-  `DATABASE_URL=file:/data/rhythm-royale.db`.
 
 ## Render
 
@@ -79,7 +77,8 @@ by hand.
   against Supabase's public API keys (row level security with no policies, and
   no grants for `anon` / `authenticated`), so only the game server can read or
   write scores.
-- **Fly**: `fly secrets set DATABASE_URL=postgres://...`.
+- **Fly**: `fly secrets set DATABASE_URL=postgres://...`, and remove the
+  `DATABASE_URL` line and `[mounts]` from `fly.toml`.
 
 If the database is unreachable the game keeps running. Only the leaderboard
 reports that it's unavailable, and it recovers by itself.
