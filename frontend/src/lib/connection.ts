@@ -11,14 +11,23 @@ type Events = ServerToClientEvents;
 type Handler<E extends keyof Events> = Events[E];
 
 /**
+ * - connected: connected, or reconnected with our seat intact.
+ * - reconnecting: the connection dropped (often just the phone backgrounding
+ *   the page); Socket.IO keeps retrying and the server holds our seat.
+ * - lost: reconnected, but too late: the server no longer knows us.
+ * - unreachable: never managed to connect at all.
+ */
+export type ConnectionStatus = "connected" | "reconnecting" | "lost" | "unreachable";
+
+/**
  * What the Battle Royale screen needs from a game: the real server over
  * Socket.IO, or the same match engine running in this tab against bots.
  */
 export interface GameConnection {
   readonly offline: boolean;
   on<E extends keyof Events>(event: E, handler: Handler<E>): void;
-  /** Called when the server can't be reached (never for offline games). */
-  onError(handler: (message: string | null) => void): void;
+  /** Connection changes (never called for offline games). */
+  onStatus(handler: (status: ConnectionStatus) => void): void;
   /** Join the next public lobby. */
   queue(name: string): void;
   /** Private rooms need the server; offline connections ignore these. */
@@ -40,11 +49,16 @@ export function socketConnection(): GameConnection {
       // Socket.IO's typed `on` can't be called with a generic event name.
       (socket.on as (e: string, h: unknown) => void)(event, handler);
     },
-    onError: (handler) => {
-      socket.on("connect", () => handler(null));
-      socket.on("connect_error", () => handler("Can't reach the game server."));
+    onStatus: (handler) => {
+      let everConnected = false;
+      socket.on("connect", () => {
+        const fresh = !everConnected;
+        everConnected = true;
+        handler(fresh || socket.recovered ? "connected" : "lost");
+      });
+      socket.on("connect_error", () => handler(everConnected ? "reconnecting" : "unreachable"));
       socket.on("disconnect", (reason) => {
-        if (reason !== "io client disconnect") handler("Lost connection to the game server.");
+        if (reason !== "io client disconnect") handler("reconnecting");
       });
     },
     queue: (name) => {
@@ -92,7 +106,7 @@ export function localConnection(): GameConnection {
     on: (event, handler) => {
       handlers.set(event, [...(handlers.get(event) ?? []), handler as (payload: unknown) => void]);
     },
-    onError: () => {},
+    onStatus: () => {},
     queue: (name) => {
       match?.removeHuman(LOCAL_PLAYER_ID);
       const current = new Match(

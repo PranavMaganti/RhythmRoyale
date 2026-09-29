@@ -46,8 +46,17 @@ app.use(cors());
 app.use(express.json({ limit: "100kb" }));
 
 const server = http.createServer(app);
+/**
+ * Phones drop the socket whenever the page goes to the background (switching
+ * apps to send an invite link, locking the screen). Hold a dropped player's
+ * seat this long; if they come back in time Socket.IO restores their session,
+ * rooms and any events they missed.
+ */
+const RECONNECT_GRACE_MS = 2 * 60 * 1000;
+
 const io = new Server<ClientToServerEvents, ServerToClientEvents>(server, {
   cors: { origin: "*", methods: ["GET", "POST"] },
+  connectionStateRecovery: { maxDisconnectionDuration: RECONNECT_GRACE_MS },
 });
 
 const matchmaker = new Matchmaker(
@@ -62,8 +71,16 @@ const matchmaker = new Matchmaker(
   matchConfig,
 );
 
+const pendingLeaves = new Map<string, ReturnType<typeof setTimeout>>();
+
 io.on("connection", (socket) => {
-  socket.emit("welcome", { playerId: socket.id });
+  if (socket.recovered) {
+    // Back in time: they never left.
+    clearTimeout(pendingLeaves.get(socket.id));
+    pendingLeaves.delete(socket.id);
+  } else {
+    socket.emit("welcome", { playerId: socket.id });
+  }
   socket.on("queue", (name) => matchmaker.join(socket.id, sanitizeName(name)));
   socket.on("create_room", (name) => matchmaker.createRoom(socket.id, sanitizeName(name)));
   socket.on("join_room", (request) => {
@@ -77,7 +94,20 @@ io.on("connection", (socket) => {
   });
   socket.on("submit", (payload) => matchmaker.submit(socket.id, payload?.round, payload?.notes));
   socket.on("leave", () => matchmaker.leave(socket.id));
-  socket.on("disconnect", () => matchmaker.leave(socket.id));
+  socket.on("disconnect", (reason) => {
+    // Closing the tab or leaving the page on purpose frees the seat straight away.
+    if (reason === "client namespace disconnect" || reason === "server shutting down") {
+      matchmaker.leave(socket.id);
+      return;
+    }
+    pendingLeaves.set(
+      socket.id,
+      setTimeout(() => {
+        pendingLeaves.delete(socket.id);
+        matchmaker.leave(socket.id);
+      }, RECONNECT_GRACE_MS),
+    );
+  });
 });
 
 // Stays 200 when the database is down: restarting the server wouldn't fix the

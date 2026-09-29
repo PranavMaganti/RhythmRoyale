@@ -28,6 +28,9 @@ export default function Royale() {
   const [name, setName] = useState(loadName());
   const [view, setView] = useState<View>("join");
   const [error, setError] = useState<string | null>(null);
+  const [reconnecting, setReconnecting] = useState(false);
+  const viewRef = useRef<View>("join");
+  viewRef.current = view;
   const [playerId, setPlayerId] = useState<string | null>(null);
   const [lobby, setLobby] = useState<{ state: LobbyState; startsAt: number | null } | null>(null);
   const [roomError, setRoomError] = useState<string | null>(null);
@@ -38,6 +41,8 @@ export default function Royale() {
   const [progress, setProgress] = useState<{ submitted: number; waitingFor: number } | null>(null);
   const [results, setResults] = useState<{ data: RoundResults; nextAt: number } | null>(null);
   const [gameOver, setGameOver] = useState<GameOver | null>(null);
+  const gameOverRef = useRef<GameOver | null>(null);
+  gameOverRef.current = gameOver;
   const [out, setOut] = useState(false);
   const attempts = useRef<Record<number, Note[]>>({});
   const idRef = useRef<string | null>(null);
@@ -61,9 +66,21 @@ export default function Royale() {
   }, []);
 
   useEffect(() => {
-    conn.onError((message) => {
-      setError(message);
-      if (message) setView((v) => (v === "connecting" ? v : "join"));
+    conn.onStatus((status) => {
+      setReconnecting(status === "reconnecting");
+      if (status === "connected") {
+        setError(null);
+      } else if (status === "unreachable") {
+        setError("Can't reach the game server.");
+      } else if (status === "lost") {
+        setError(null);
+        // Only matters if we were in the middle of something.
+        const finished = viewRef.current === "results" && gameOverRef.current;
+        if (viewRef.current !== "join" && !finished) {
+          setRoomError("You were away too long and lost your place. Join again below.");
+          setView("join");
+        }
+      }
     });
     conn.on("welcome", ({ playerId }) => {
       idRef.current = playerId;
@@ -204,8 +221,9 @@ export default function Royale() {
     </div>
   );
 
-  const errorBanner = (error || roomError) && (
+  const errorBanner = (error || roomError || reconnecting) && (
     <>
+      {reconnecting && <div className="banner pulse">Connection dropped. Reconnecting…</div>}
       {roomError && <div className="banner banner--error">{roomError}</div>}
       {error && connectionBanner}
     </>
