@@ -37,8 +37,11 @@ COPY --from=build /app/common/dist common/dist
 COPY --from=build /app/backend/dist backend/dist
 COPY --from=build /app/frontend/dist frontend/dist
 COPY backend/sql backend/sql
-USER node
+COPY --chmod=755 docker-entrypoint.sh /usr/local/bin/
 EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s \
   CMD node -e "fetch('http://localhost:'+process.env.PORT+'/api/health').then(r=>process.exit(r.ok?0:1),()=>process.exit(1))"
+# The entrypoint prepares a SQLite volume if one is used, then runs the
+# server as the unprivileged `node` user.
+ENTRYPOINT ["docker-entrypoint.sh"]
 CMD ["node", "backend/dist/index.js"]

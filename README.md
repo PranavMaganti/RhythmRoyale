@@ -116,15 +116,15 @@ with Practice, Daily and Battle Royale against bots that works with no server at
 
 ### Deploying
 
-See [DEPLOY.md](DEPLOY.md). In short: Supabase (Postgres) for the daily leaderboard, and the
-game server as a container on Render (`render.yaml`) or Fly.io (`fly.toml`), or anywhere else
-that runs the `Dockerfile`.
+See [DEPLOY.md](DEPLOY.md). Everything runs on one platform: Fly.io (`fly.toml`: the server
+plus a volume holding a SQLite leaderboard) or Render (`render.yaml`: the server plus Render
+Postgres), or anywhere else that runs the `Dockerfile`.
 
 ### Server configuration
 
 | Variable         | Default | Meaning                                       |
 | ---------------- | ------- | --------------------------------------------- |
-| `DATABASE_URL`   | unset   | Postgres for the daily leaderboard (memory otherwise) |
+| `DATABASE_URL`   | unset   | Daily leaderboard storage: `file:/path.db` (SQLite) or `postgres://…`; memory otherwise |
 | `PORT`           | 5000    | HTTP port                                     |
 | `MAX_PLAYERS`    | 10      | Seats per battle royale lobby                 |
 | `LOBBY_WAIT_MS`  | 15000   | How long a lobby waits for people before bots |
@@ -136,8 +136,8 @@ separately from the server.
 
 ### Tests against Postgres
 
-The daily leaderboard tests run against the in-memory store, and also against Postgres when
-`TEST_DATABASE_URL` points at a disposable database (CI provides one):
+The daily leaderboard tests always run against the in-memory and SQLite stores, and also
+against Postgres when `TEST_DATABASE_URL` points at a disposable database (CI provides one):
 
 ```sh
 docker run -d -p 5433:5432 -e POSTGRES_PASSWORD=test postgres:17-alpine

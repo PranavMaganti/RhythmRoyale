@@ -1,8 +1,18 @@
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import { type DailyStanding, dailyRhythms } from "@rhythm-royale/common";
 import postgres from "postgres";
 import { afterAll, beforeEach, describe, expect, test } from "vitest";
 import { DailyBoard } from "./daily.js";
-import { type DailyStore, MemoryDailyStore, PostgresDailyStore } from "./dailyStore.js";
+import {
+  createDailyStore,
+  type DailyStore,
+  MemoryDailyStore,
+  PostgresDailyStore,
+  SqliteDailyStore,
+  sqlitePath,
+} from "./dailyStore.js";
 
 const TODAY = "2026-09-28";
 const perfect = dailyRhythms(TODAY).map((r) => r.notes);
@@ -12,8 +22,24 @@ const nothing = perfect.map(() => []);
 // (CI starts one); otherwise only the in-memory store is exercised.
 const TEST_DATABASE_URL = process.env.TEST_DATABASE_URL;
 
+const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "rhythm-royale-"));
+let sqliteFiles = 0;
+const sqliteStores: DailyStore[] = [];
+afterAll(async () => {
+  await Promise.all(sqliteStores.map((s) => s.close()));
+  fs.rmSync(tmp, { recursive: true, force: true });
+});
+
 const stores: Array<[string, () => Promise<DailyStore>]> = [
   ["memory", async () => new MemoryDailyStore()],
+  [
+    "sqlite",
+    async () => {
+      const store = await SqliteDailyStore.open(path.join(tmp, `test-${sqliteFiles++}.db`));
+      sqliteStores.push(store);
+      return store;
+    },
+  ],
 ];
 if (TEST_DATABASE_URL) {
   const opened: DailyStore[] = [];
@@ -115,5 +141,41 @@ describe.each(stores)("DailyBoard (%s store)", (_kind, open) => {
 
   test("an empty day has an empty leaderboard", async () => {
     expect(await (await board()).leaderboard(TODAY)).toEqual({ date: TODAY, players: 0, top: [] });
+  });
+});
+
+describe("SQLite store", () => {
+  test("keeps results across restarts", async () => {
+    const file = path.join(tmp, "nested", "dir", "persist.db");
+    const first = await SqliteDailyStore.open(file);
+    await first.addFirst(TODAY, "token-123", {
+      name: "Ann",
+      total: 420,
+      scores: [100, 90, 80, 80, 70],
+    });
+    await first.close();
+
+    const second = await SqliteDailyStore.open(file);
+    sqliteStores.push(second);
+    expect(await second.top(TODAY, 10)).toEqual([{ name: "Ann", total: 420 }]);
+    expect(
+      await second.addFirst(TODAY, "token-123", { name: "Ann", total: 0, scores: [0, 0, 0, 0, 0] }),
+    ).toEqual({ name: "Ann", total: 420, scores: [100, 90, 80, 80, 70] });
+  });
+});
+
+describe("createDailyStore", () => {
+  test("reads SQLite file paths from DATABASE_URL", () => {
+    expect(sqlitePath("file:/data/rhythm-royale.db")).toBe("/data/rhythm-royale.db");
+    expect(sqlitePath("file:///data/rhythm-royale.db")).toBe("/data/rhythm-royale.db");
+    expect(sqlitePath("sqlite:./local.db")).toBe("./local.db");
+  });
+
+  test("picks storage from the URL scheme", async () => {
+    expect((await createDailyStore(undefined)).kind).toBe("memory");
+    const sqlite = await createDailyStore(`file:${path.join(tmp, "picked.db")}`);
+    sqliteStores.push(sqlite);
+    expect(sqlite.kind).toBe("sqlite");
+    await expect(createDailyStore("mysql://nope")).rejects.toThrow(/DATABASE_URL/);
   });
 });

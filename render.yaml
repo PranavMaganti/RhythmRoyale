@@ -1,5 +1,6 @@
-# Render: New > Blueprint, pick this repository, and paste your Supabase
-# connection string when asked for DATABASE_URL. See DEPLOY.md.
+# Render, everything in one place: in Render choose New > Blueprint and pick
+# this repository. It creates the game server and a Postgres database for the
+# daily leaderboard, and connects them. See DEPLOY.md.
 services:
   - type: web
     name: rhythm-royale
@@ -9,4 +10,11 @@ services:
     healthCheckPath: /api/health
     envVars:
       - key: DATABASE_URL
-        sync: false
+        fromDatabase:
+          name: rhythm-royale-db
+          property: connectionString
+
+databases:
+  - name: rhythm-royale-db
+    plan: free
+    databaseName: rhythm_royale

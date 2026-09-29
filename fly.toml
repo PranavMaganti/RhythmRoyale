@@ -1,10 +1,21 @@
-# Fly.io: `fly launch --no-deploy` (keep this file), then
-# `fly secrets set DATABASE_URL=...` and `fly deploy`. See DEPLOY.md.
+# Fly.io, everything in one place: the game server plus a small volume that
+# holds the daily leaderboard (SQLite). See DEPLOY.md.
+#
+#   fly launch --no-deploy --copy-config --name <your-app-name>
+#   fly volumes create rhythm_data --size 1 --region lhr
+#   fly deploy
 app = "rhythm-royale"
 primary_region = "lhr"
 
 [env]
   PORT = "8080"
+  # Remove this line and `fly secrets set DATABASE_URL=postgres://...` to use
+  # Postgres (Supabase, Fly Managed Postgres...) instead of the volume.
+  DATABASE_URL = "file:/data/rhythm-royale.db"
+
+[mounts]
+  source = "rhythm_data"
+  destination = "/data"
 
 [http_service]
   internal_port = 8080
