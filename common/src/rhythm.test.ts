@@ -104,7 +104,7 @@ describe("pitches", () => {
       const firstBeats = (from: number) =>
         r.notes
           .filter((n) => n.start >= from && n.start < from + bar / 4)
-          .map((n) => n.start - from);
+          .map((n) => Math.round(n.start - from));
       expect(firstBeats(bar)).toEqual(firstBeats(0));
     }
   });
@@ -115,11 +115,24 @@ describe("pitches", () => {
     expect(padNames(4)).toEqual(["do", "re", "mi", "sol"]);
   });
 
-  test("the pitch preview only plays when there is more than one key", () => {
+  test("the pitch preview plays only the pads in play, and only when there's more than one", () => {
     expect(referenceMs(1)).toBe(0);
     expect(referenceMs(4)).toBeGreaterThan(referenceMs(2));
     const mono = generateRhythm(1, seededRng(1));
-    const poly = { ...mono, pitches: 4 };
-    expect(roundTiming(poly).listenMs - roundTiming(mono).listenMs).toBe(referenceMs(4));
+    const two = { ...mono, pitches: 4, lanes: [0, 3] };
+    const all = { ...mono, pitches: 4, lanes: [0, 1, 2, 3] };
+    expect(roundTiming(two).listenMs - roundTiming(mono).listenMs).toBe(referenceMs(2));
+    expect(roundTiming(all).listenMs - roundTiming(mono).listenMs).toBe(referenceMs(4));
+  });
+
+  test("each level brings in one more pad until all four are in play", () => {
+    const rng = seededRng("lanes");
+    expect([1, 2, 3, 4, 5].map((level) => generateRhythm(level, rng).lanes)).toEqual([
+      [0],
+      [0, 3],
+      [0, 2, 3],
+      [0, 1, 2, 3],
+      [0, 1, 2, 3],
+    ]);
   });
 });

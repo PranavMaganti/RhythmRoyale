@@ -2,7 +2,14 @@ import { botName, botSkills, type SkillDistribution } from "./botNames.js";
 import { simulateAttempt } from "./bots.js";
 import type { PlayerInfo, RoundResultEntry, ServerToClientEvents } from "./protocol.js";
 import type { Rng } from "./random.js";
-import { generateRhythm, MAX_DIFFICULTY, type Note, type Rhythm, roundTiming } from "./rhythm.js";
+import {
+  ALL_PADS_DIFFICULTY,
+  generateRhythm,
+  type Note,
+  type Rhythm,
+  ROYALE_MAX_DIFFICULTY,
+  roundTiming,
+} from "./rhythm.js";
 import { sanitizeNotes, scoreAttempt } from "./scoring.js";
 
 export interface MatchConfig {
@@ -51,13 +58,17 @@ export function plannedRounds(players: number, rate: number): number {
 }
 
 /**
- * Spread the difficulty levels across the match so the opening round is
- * gentle and the final round always uses every pitch.
+ * One level per round, so no step is skipped: the opening round is gentle and
+ * each round changes one thing. The final round always uses every pad; short
+ * matches squeeze the ramp to get there, long ones top out at
+ * ROYALE_MAX_DIFFICULTY.
  */
 export function difficultyForRound(round: number, totalRounds: number): number {
-  if (totalRounds <= 1) return MAX_DIFFICULTY;
-  const level = 1 + ((round - 1) * (MAX_DIFFICULTY - 1)) / (totalRounds - 1);
-  return Math.min(MAX_DIFFICULTY, Math.max(1, Math.round(level)));
+  const last = Math.min(ROYALE_MAX_DIFFICULTY, Math.max(ALL_PADS_DIFFICULTY, totalRounds));
+  if (totalRounds <= 1) return last;
+  if (totalRounds >= last) return Math.min(round, last);
+  const level = 1 + ((round - 1) * (last - 1)) / (totalRounds - 1);
+  return Math.min(last, Math.max(1, Math.round(level)));
 }
 
 export function eliminationCount(alive: number, rate: number): number {

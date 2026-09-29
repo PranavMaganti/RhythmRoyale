@@ -22,11 +22,20 @@ engine runs in the browser against bots.
 
 ### Melodies
 
-Level 1 is rhythm only, on a single pad. From level 2 there are always four pads (do, re, mi and
-sol: C D E G), so thumbs can learn where each one is, and each level's tunes use more of them:
-do and sol at level 2, then do, mi and sol, then all four. After that the rhythms get busier. A
-royale plans its rounds when it starts and spreads the levels across them, so the first round is
-always one note and the final round always uses all four.
+Each level changes one thing:
+
+| Level | Pads in play       | Length | Rhythms                          |
+| ----- | ------------------ | ------ | -------------------------------- |
+| 1     | 1 (a single pad)   | 1 bar  | quarters, eighths, halves, dots  |
+| 2     | do, sol            | 1 bar  | same                             |
+| 3     | do, mi, sol        | 1 bar  | same                             |
+| 4     | do, re, mi, sol    | 2 bars | same, plus a rest                |
+| 5     | all four           | 2 bars | adds syncopation and off-beats   |
+| 6     | all four           | 2 bars | sixteenth-note runs (practice)   |
+
+From level 2 all four pads (C D E G) are always on screen, so thumbs learn where each one is;
+pads not in play yet are faded and can't be pressed. A royale goes up one level per round and
+tops out at level 5. Short matches squeeze the ramp so the final round still uses all four pads.
 
 Tunes are generated, but built the way real ones are:
 

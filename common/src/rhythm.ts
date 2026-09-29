@@ -16,6 +16,8 @@ export interface Rhythm {
   beats: number;
   /** How many pads (keys) the round shows: 1, or 4 once melodies start. */
   pitches: number;
+  /** Pads in play this round, low to high; the rest are shown but faded. All when absent. */
+  lanes?: number[];
   notes: Note[];
 }
 
@@ -106,25 +108,28 @@ interface DifficultySpec {
 const BASIC: CellName[] = ["quarter", "eighths", "half", "dottedQuarter"];
 
 /**
- * Level 1 is rhythm only, on a single pad. From level 2 the four pads stay put
- * and melodies use more of them (low and high first, as they're easiest to
- * tell apart), then the rhythms get busier.
+ * Each level changes one thing. Level 1 is rhythm only, on a single pad. Then
+ * the four pads stay put and the tunes use more of them, one at a time (low
+ * and high first, as they're easiest to tell apart), while staying one bar
+ * long. Level 4 doubles the length, but the second bar echoes the first.
+ * Level 5 adds syncopation. Level 6 (sixteenth-note runs) is an expert level
+ * for practice; battle royales stop at ROYALE_MAX_DIFFICULTY.
  */
 export const DIFFICULTIES: readonly DifficultySpec[] = [
   { bpm: 90, beats: 4, cells: BASIC, lanes: [0], pads: 1 },
-  { bpm: 95, beats: 4, cells: BASIC, lanes: [0, 3], pads: 4 },
-  { bpm: 100, beats: 8, cells: [...BASIC, "quarterRest"], lanes: [0, 2, 3], pads: 4 },
+  { bpm: 90, beats: 4, cells: BASIC, lanes: [0, 3], pads: 4 },
+  { bpm: 95, beats: 4, cells: BASIC, lanes: [0, 2, 3], pads: 4 },
   {
-    bpm: 100,
+    bpm: 95,
     beats: 8,
-    cells: [...BASIC, "syncopated", "offbeat", "quarterRest"],
+    cells: [...BASIC, "quarterRest"],
     lanes: [0, 1, 2, 3],
     pads: 4,
   },
   {
-    bpm: 105,
+    bpm: 100,
     beats: 8,
-    cells: [...BASIC, "syncopated", "dottedEighth", "eighthSixteenths"],
+    cells: [...BASIC, "syncopated", "offbeat", "quarterRest"],
     lanes: [0, 1, 2, 3],
     pads: 4,
   },
@@ -147,6 +152,10 @@ export const DIFFICULTIES: readonly DifficultySpec[] = [
 ];
 
 export const MAX_DIFFICULTY = DIFFICULTIES.length;
+/** The hardest level a battle royale reaches. */
+export const ROYALE_MAX_DIFFICULTY = 5;
+/** The first level that uses every pad: short matches end here. */
+export const ALL_PADS_DIFFICULTY = 4;
 export const MAX_PITCHES = 4;
 
 /**
@@ -166,6 +175,11 @@ export function pitchNames(count: number): string[] {
 export function padNames(count: number): string[] {
   const n = Math.min(MAX_PITCHES, Math.max(1, Math.round(count)));
   return n === 1 ? [""] : SOLFEGE.slice(0, n);
+}
+
+/** Pads in play this round, low to high. */
+export function activeLanes(rhythm: Rhythm): number[] {
+  return rhythm.lanes ?? Array.from({ length: rhythm.pitches }, (_, i) => i);
 }
 
 /** How many different pads a phrase actually uses. */
@@ -207,7 +221,7 @@ export function roundTiming(rhythm: Rhythm): {
   const beat = beatMs(rhythm.bpm);
   // Count-in, the phrase, then one beat of breathing room.
   const phraseMs = (COUNT_IN_BEATS + rhythm.beats + 1) * beat;
-  const listenMs = LEAD_IN_MS + referenceMs(rhythm.pitches) + phraseMs;
+  const listenMs = LEAD_IN_MS + referenceMs(activeLanes(rhythm).length) + phraseMs;
   const recordMs = phraseMs;
   return { listenMs, recordMs, totalMs: listenMs + recordMs };
 }
@@ -358,6 +372,7 @@ export function generateRhythm(difficulty: number, rng: Rng = Math.random): Rhyt
     bpm: spec.bpm,
     beats: spec.beats,
     pitches: spec.pads,
+    lanes: [...spec.lanes],
     notes: steps.map(([pos, len], i) => {
       const slot = len * sixteenth;
       // Let go a moment before the next note so each one is a separate press.

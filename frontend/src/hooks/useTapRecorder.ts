@@ -5,6 +5,8 @@ import { laneForKey } from "../lib/keys";
 interface Options {
   enabled: boolean;
   pitches: number;
+  /** Lanes that can be played this round; keys for the others are ignored. */
+  lanes: readonly number[];
   /** Ignore presses that begin this long before the origin (e.g. tapping along to the count-in). */
   earlyToleranceMs: number;
   onPress?: (lane: number) => void;
@@ -19,6 +21,7 @@ interface Options {
 export function useTapRecorder({
   enabled,
   pitches,
+  lanes,
   earlyToleranceMs,
   onPress,
   onRelease,
@@ -30,6 +33,8 @@ export function useTapRecorder({
   const notesRef = useRef<Note[]>([]);
   const callbacks = useRef({ onPress, onRelease });
   callbacks.current = { onPress, onRelease };
+  const lanesRef = useRef(lanes);
+  lanesRef.current = lanes;
 
   const syncHeld = useCallback(() => setHeld(new Set(downAtRef.current.keys())), []);
 
@@ -89,7 +94,7 @@ export function useTapRecorder({
       const lane = laneForKey(e.key, pitches);
       if (lane === null) return;
       e.preventDefault();
-      if (!e.repeat) press(lane);
+      if (!e.repeat && lanesRef.current.includes(lane)) press(lane);
     };
     const up = (e: KeyboardEvent) => {
       const lane = laneForKey(e.key, pitches);

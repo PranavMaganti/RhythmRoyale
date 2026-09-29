@@ -98,9 +98,9 @@ export default function Practice() {
       <section className="card center">
         <h1>Practice</h1>
         <p className="muted">
-          No pressure. Level 1 is a few slow taps on one note. Then come short tunes on four pads,
-          using more of them each level; level {MAX_DIFFICULTY} is quick phrases like the final
-          round of a royale.
+          No pressure. Level 1 is a few slow taps on one note. Levels 2 to 4 bring in the other pads
+          one at a time, then level 5 adds syncopation, like the final round of a royale. Level{" "}
+          {MAX_DIFFICULTY} is an expert level with quick sixteenth-note runs.
         </p>
         {levels}
         <button

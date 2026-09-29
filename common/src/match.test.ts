@@ -49,10 +49,19 @@ describe("difficulty ramp", () => {
     expect(plannedRounds(1, 0.3)).toBe(0);
   });
 
-  test("starts easy and the final round uses every pitch", () => {
-    expect([1, 2, 3, 4, 5].map((r) => difficultyForRound(r, 5))).toEqual([1, 2, 4, 5, 6]);
-    expect([1, 2, 3, 4].map((r) => difficultyForRound(r, 4))).toEqual([1, 3, 4, 6]);
-    expect(difficultyForRound(1, 1)).toBe(6);
+  test("goes up one level per round without skipping any", () => {
+    expect([1, 2, 3, 4, 5].map((r) => difficultyForRound(r, 5))).toEqual([1, 2, 3, 4, 5]);
+    expect([1, 2, 3, 4].map((r) => difficultyForRound(r, 4))).toEqual([1, 2, 3, 4]);
+  });
+
+  test("tops out below the expert level in long matches", () => {
+    expect([5, 6, 7].map((r) => difficultyForRound(r, 7))).toEqual([5, 5, 5]);
+  });
+
+  test("short matches still end on a round that uses every pad", () => {
+    expect([1, 2, 3].map((r) => difficultyForRound(r, 3))).toEqual([1, 3, 4]);
+    expect([1, 2].map((r) => difficultyForRound(r, 2))).toEqual([1, 4]);
+    expect(difficultyForRound(1, 1)).toBe(4);
   });
 });
 

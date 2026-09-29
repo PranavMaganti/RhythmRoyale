@@ -567,6 +567,14 @@ kbd {
   --pin: var(--paper);
   color: var(--paper);
 }
+/* Not in play this round: a pencilled-in outline, unlocked in a later round. */
+.pad--idle {
+  opacity: 0.3;
+  cursor: default;
+}
+.pad--idle::before {
+  border-style: dashed;
+}
 
 /* One note: a big note head with a stem, filled in while you hold it. */
 .pads--single {
