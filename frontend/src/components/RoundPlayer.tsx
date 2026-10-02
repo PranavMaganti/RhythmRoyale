@@ -15,9 +15,18 @@ import {
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import * as Tone from "tone";
 import { useTapRecorder } from "../hooks/useTapRecorder";
-import { createInstruments, type Instruments } from "../lib/audio";
+import {
+  createInstruments,
+  HIGH_LATENCY_MS,
+  type Instruments,
+  outputLatencyMs,
+} from "../lib/audio";
 import { isTouchDevice, keyLabel, laneKeys } from "../lib/keys";
+import { loadTapSounds, saveTapSounds } from "../lib/storage";
 import RhythmLane from "./RhythmLane";
+
+/** Once someone has read the headphone note, don't repeat it every round. */
+let latencyNoteDismissed = false;
 
 type Phase = "preview" | "listen" | "prepare" | "record" | "done";
 
@@ -51,6 +60,28 @@ export default function RoundPlayer({ rhythm, onComplete, heading }: Props) {
   const instruments = useRef<Instruments | null>(null);
   const onCompleteRef = useRef(onComplete);
   onCompleteRef.current = onComplete;
+  const [tapSounds, setTapSounds] = useState(loadTapSounds);
+  const tapSoundsRef = useRef(tapSounds);
+  tapSoundsRef.current = tapSounds;
+  const toggleTapSounds = () => {
+    saveTapSounds(!tapSounds);
+    setTapSounds(!tapSounds);
+  };
+  // High output latency (Bluetooth headphones): explain what to expect.
+  const [latency, setLatency] = useState<number | null>(null);
+  useEffect(() => {
+    let live = true;
+    outputLatencyMs().then((ms) => {
+      if (live && !latencyNoteDismissed && ms !== null && ms >= HIGH_LATENCY_MS) setLatency(ms);
+    });
+    return () => {
+      live = false;
+    };
+  }, []);
+  const dismissLatencyNote = () => {
+    latencyNoteDismissed = true;
+    setLatency(null);
+  };
 
   const names = pitchNames(rhythm.pitches);
   const lanes = activeLanes(rhythm);
@@ -64,10 +95,13 @@ export default function RoundPlayer({ rhythm, onComplete, heading }: Props) {
     // Tone.js schedules into the future by default (its lookAhead, 100 ms), which
     // is right for the tune but makes your own presses sound late. Play them now.
     onPress: (lane) => {
-      instruments.current?.echo.triggerAttack(names[lane], Tone.immediate());
+      if (tapSoundsRef.current) {
+        instruments.current?.echo.triggerAttack(names[lane], Tone.immediate());
+      }
       // A tiny buzz confirms the press on phones that support it (not iOS).
       navigator.vibrate?.(8);
     },
+    // Always release, so switching sounds off mid-note can't leave one ringing.
     onRelease: (lane) => instruments.current?.echo.triggerRelease(names[lane], Tone.immediate()),
   });
   const { arm, finish } = recorder;
@@ -190,10 +224,51 @@ export default function RoundPlayer({ rhythm, onComplete, heading }: Props) {
   const lengthMs = rhythmLengthMs(rhythm) + beat;
   const isLit = (lane: number) =>
     phase === "preview" || phase === "listen" ? lit === lane : recorder.held.has(lane);
+  // Notes you've finished, plus the ones you're holding, growing up to the
+  // playhead, so you can see how long you've held without hearing yourself.
+  const liveNotes = [
+    ...recorder.notes,
+    ...Array.from(recorder.held, ([pitch, start]) => ({
+      start,
+      duration: Math.max(0, (playhead ?? start) - start),
+      pitch,
+    })),
+  ].map((n) => ({ ...n, tone: "live" as const }));
 
   return (
     <div className="round">
       <div className="round-top">
+        <button
+          type="button"
+          className="sound-toggle"
+          aria-pressed={tapSounds}
+          onClick={toggleTapSounds}
+          title="Play a note when you press a pad"
+        >
+          {tapSounds ? "🔊 Tap sounds on" : "🔇 Tap sounds off"}
+        </button>
+        {latency !== null && tapSounds && phase !== "record" && (
+          <div className="banner latency-note" role="note">
+            <p>
+              🎧 Your headphones delay sound by about {latency} ms. Play to the beat you hear; your
+              own taps will sound late, and that&apos;s fine.
+            </p>
+            <div className="latency-actions">
+              {tapSounds && (
+                <button type="button" className="btn btn--small" onClick={toggleTapSounds}>
+                  Mute my taps
+                </button>
+              )}
+              <button
+                type="button"
+                className="btn btn--small btn--ghost"
+                onClick={dismissLatencyNote}
+              >
+                Got it
+              </button>
+            </div>
+          </div>
+        )}
         {heading && <div className="round-heading">{heading}</div>}
         <h2 className={`round-headline round-headline--${phase}`}>{HEADLINES[phase]}</h2>
         <p className="muted round-hint">{hints[phase]}</p>
@@ -201,7 +276,7 @@ export default function RoundPlayer({ rhythm, onComplete, heading }: Props) {
       </div>
       <RhythmLane
         label={recording ? "You" : undefined}
-        notes={recorder.notes.map((n) => ({ ...n, tone: "live" }))}
+        notes={liveNotes}
         pitches={rhythm.pitches}
         lengthMs={lengthMs}
         beatMs={beat}

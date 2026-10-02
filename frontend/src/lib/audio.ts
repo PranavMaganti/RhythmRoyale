@@ -6,6 +6,8 @@ export async function unlockAudio(): Promise<void> {
   // it plays media (Safari 16.4+). A game with no sound is no game.
   const session = (navigator as Navigator & { audioSession?: { type: string } }).audioSession;
   if (session) session.type = "playback";
+  // Started inside the same gesture, as Safari requires; finishes on its own.
+  latency = measureOutputLatency();
   if (Tone.getContext().state !== "running") {
     await Tone.start();
   }
@@ -13,6 +15,47 @@ export async function unlockAudio(): Promise<void> {
 
 export function audioReady(): boolean {
   return Tone.getContext().state === "running";
+}
+
+/** Above this, players hear their own taps noticeably late (typical of Bluetooth). */
+export const HIGH_LATENCY_MS = 100;
+
+let latency: Promise<number | null> = Promise.resolve(null);
+
+/**
+ * How long sound takes to reach the speakers or headphones, in ms, or null if
+ * the browser doesn't say (Safari may not). Bluetooth headphones are usually
+ * 150 to 250 ms; wired ones and phone speakers well under 50. Measured each
+ * time audio is unlocked, in case headphones were connected since.
+ */
+export function outputLatencyMs(): Promise<number | null> {
+  return latency;
+}
+
+/**
+ * Tone.js wraps the AudioContext and doesn't pass `outputLatency` through, so
+ * open a plain one for a moment and ask it. Same device, same answer.
+ */
+async function measureOutputLatency(): Promise<number | null> {
+  const Ctx =
+    window.AudioContext ??
+    (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+  if (!Ctx) return null;
+  let ctx: AudioContext | undefined;
+  try {
+    ctx = new Ctx({ latencyHint: "interactive" });
+    await ctx.resume();
+    // The figure is only filled in once audio is actually flowing.
+    await new Promise((resolve) => setTimeout(resolve, 250));
+    const output = ctx.outputLatency;
+    if (typeof output !== "number" || !Number.isFinite(output) || output <= 0) return null;
+    return Math.round((output + (ctx.baseLatency ?? 0)) * 1000);
+  } catch {
+    // Not knowing just means no headphone note.
+    return null;
+  } finally {
+    ctx?.close().catch(() => undefined);
+  }
 }
 
 export interface Instruments {

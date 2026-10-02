@@ -27,7 +27,8 @@ export function useTapRecorder({
   onRelease,
 }: Options) {
   const [notes, setNotes] = useState<Note[]>([]);
-  const [held, setHeld] = useState<ReadonlySet<number>>(new Set());
+  /** Lanes held down right now, with when each press started (ms from the origin). */
+  const [held, setHeld] = useState<ReadonlyMap<number, number>>(new Map());
   const originRef = useRef(0);
   const downAtRef = useRef(new Map<number, number>());
   const notesRef = useRef<Note[]>([]);
@@ -36,7 +37,15 @@ export function useTapRecorder({
   const lanesRef = useRef(lanes);
   lanesRef.current = lanes;
 
-  const syncHeld = useCallback(() => setHeld(new Set(downAtRef.current.keys())), []);
+  const syncHeld = useCallback(
+    () =>
+      setHeld(
+        new Map(
+          Array.from(downAtRef.current, ([lane, downAt]) => [lane, downAt - originRef.current]),
+        ),
+      ),
+    [],
+  );
 
   const press = useCallback(
     (lane: number) => {
@@ -76,7 +85,7 @@ export function useTapRecorder({
     downAtRef.current.clear();
     notesRef.current = [];
     setNotes([]);
-    setHeld(new Set());
+    setHeld(new Map());
   }, []);
 
   /** Stop recording, closing any note that is still held. */

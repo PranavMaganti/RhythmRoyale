@@ -16,6 +16,15 @@ export function save(key: string, value: unknown): void {
   }
 }
 
+/** Whether pressing a pad plays its note. Off suits Bluetooth headphones, where it sounds late. */
+export function loadTapSounds(): boolean {
+  return load("tapSounds", true);
+}
+
+export function saveTapSounds(on: boolean): void {
+  save("tapSounds", on);
+}
+
 export function loadName(): string {
   return load("name", "");
 }

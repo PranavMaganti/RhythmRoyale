@@ -1108,3 +1108,44 @@ kbd {
   text-decoration: underline;
   cursor: pointer;
 }
+
+/* Small outlined buttons (e.g. "Share…", "Got it") next to a filled one. */
+.btn--small.btn--ghost {
+  --fill: transparent;
+  color: var(--ink);
+}
+
+/* Tap sounds on/off: tucked in the corner of every round. */
+.round-top {
+  position: relative;
+}
+.sound-toggle {
+  font: inherit;
+  font-size: 0.9rem;
+  color: var(--ink-soft);
+  background: none;
+  border: 0;
+  padding: 0.2rem 0;
+  cursor: pointer;
+  display: block;
+  margin: 0 0 0.25rem auto;
+}
+.sound-toggle:hover {
+  color: var(--ink);
+}
+
+/* Bluetooth headphones: what to expect and how to play with them. */
+.latency-note {
+  text-align: left;
+  margin-bottom: 0.75rem;
+}
+.latency-note p {
+  margin: 0;
+  flex: 1 1 16rem;
+  font-size: 1rem;
+  line-height: 1.35;
+}
+.latency-actions {
+  display: flex;
+  gap: 0.5rem;
+}
