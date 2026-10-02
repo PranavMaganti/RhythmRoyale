@@ -1,0 +1,8 @@
+packages:
+  - common
+  - backend
+  - frontend
+
+# Dependencies allowed to run install scripts (pnpm blocks the rest).
+allowBuilds:
+  esbuild: true

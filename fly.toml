@@ -1,0 +1,43 @@
+# Fly.io, everything in one place: the game server plus a small volume that
+# holds the daily leaderboard (SQLite). See DEPLOY.md.
+#
+#   fly launch --no-deploy --copy-config --name <your-app-name>
+#   fly volumes create rhythm_data --size 1 --region lhr
+#   fly deploy --ha=false   # one machine; a second would split matches
+app = "rhythmroyale"
+primary_region = "lhr"
+
+[env]
+  PORT = "8080"
+  # Remove this line and `fly secrets set DATABASE_URL=postgres://...` to use
+  # Postgres (Supabase, Fly Managed Postgres...) instead of the volume.
+  DATABASE_URL = "file:/data/rhythm-royale.db"
+
+[mounts]
+  source = "rhythm_data"
+  destination = "/data"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  # Matches live in the server's memory, so keep exactly one machine running:
+  # stopping it (or adding a second) would split or end games in progress.
+  auto_stop_machines = "off"
+  auto_start_machines = true
+  min_machines_running = 1
+
+  [http_service.concurrency]
+    type = "connections"
+    soft_limit = 800
+    hard_limit = 1000
+
+  [[http_service.checks]]
+    grace_period = "15s"
+    interval = "30s"
+    method = "GET"
+    path = "/api/health"
+    timeout = "5s"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"

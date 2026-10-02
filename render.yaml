@@ -1,0 +1,20 @@
+# Render, everything in one place: in Render choose New > Blueprint and pick
+# this repository. It creates the game server and a Postgres database for the
+# daily leaderboard, and connects them. See DEPLOY.md.
+services:
+  - type: web
+    name: rhythm-royale
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /api/health
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: rhythm-royale-db
+          property: connectionString
+
+databases:
+  - name: rhythm-royale-db
+    plan: free
+    databaseName: rhythm_royale

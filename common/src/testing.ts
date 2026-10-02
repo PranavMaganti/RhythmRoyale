@@ -1,0 +1,36 @@
+import type { MatchConfig, MatchTransport } from "./match.js";
+import type { ServerToClientEvents } from "./protocol.js";
+import { seededRng } from "./random.js";
+
+type EventName = keyof ServerToClientEvents;
+
+export interface SentEvent {
+  to: string;
+  event: EventName;
+  payload: unknown;
+}
+
+/** Transport that just records what would have gone over the wire. */
+export function recordingTransport(log: SentEvent[], matchId = "match"): MatchTransport {
+  return {
+    broadcast: (event, ...args) => log.push({ to: matchId, event, payload: args[0] }),
+    send: (playerId, event, ...args) => log.push({ to: playerId, event, payload: args[0] }),
+  };
+}
+
+export function lastPayload<T>(log: SentEvent[], event: EventName): T {
+  const found = log.filter((e) => e.event === event);
+  if (found.length === 0) throw new Error(`No ${event} event was sent`);
+  return found[found.length - 1].payload as T;
+}
+
+export const TEST_CONFIG: MatchConfig = {
+  maxPlayers: 6,
+  lobbyWaitMs: 10000,
+  resultsMs: 5000,
+  graceMs: 2000,
+  eliminationRate: 0.3,
+  botSkill: { mean: 0.55, sd: 0.2 },
+};
+
+export const testRng = (): (() => number) => seededRng("tests");

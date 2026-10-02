@@ -1,13 +1,1151 @@
-body {
-  margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-    sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+/*
+ * Layout: one centred column on plain manuscript paper. Everything is drawn in
+ * ink (chalk on a blackboard in dark mode); colour appears only as timing
+ * feedback: good, close, missed.
+ */
+:root {
+  --paper: #fdfdfb;
+  --ink: #171717;
+  --ink-soft: #5f5e5a;
+  --rule: #e4e3de;
+  --wash: #efeee9;
+  --good: #1f8f55;
+  --ok: #c08400;
+  --bad: #cf3a3a;
+
+  --font-hand: "Caveat", "Segoe Print", "Bradley Hand", cursive;
+  --font-body: "Patrick Hand", "Segoe Print", "Bradley Hand", "Comic Sans MS", cursive;
+
+  /* Irregular radii read as hand-drawn boxes and circles. */
+  --wobble-a: 255px 15px 225px 15px / 15px 225px 15px 255px;
+  --wobble-b: 15px 255px 15px 225px / 225px 15px 255px 15px;
+  --wobble-c: 25px 225px 20px 245px / 235px 18px 230px 20px;
+  --wobble-round: 50% 46% 52% 48% / 48% 52% 46% 50%;
+  --hatch: repeating-linear-gradient(-45deg, var(--ink) 0 2px, transparent 2px 7px);
+  color-scheme: light;
 }
 
-code {
-  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
-    monospace;
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #161616;
+    --ink: #f2f0e9;
+    --ink-soft: #a9a79f;
+    --rule: #2c2c2a;
+    --wash: #242422;
+    --good: #52cf8e;
+    --ok: #f2b632;
+    --bad: #ff6f6f;
+    color-scheme: dark;
+  }
+}
+
+:root[data-theme="dark"] {
+  --paper: #161616;
+  --ink: #f2f0e9;
+  --ink-soft: #a9a79f;
+  --rule: #2c2c2a;
+  --wash: #242422;
+  --good: #52cf8e;
+  --ok: #f2b632;
+  --bad: #ff6f6f;
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  min-height: 100%;
+}
+
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 1.15rem;
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2 {
+  font-family: var(--font-hand);
+  font-weight: 700;
+  line-height: 1.05;
+  margin: 0 0 0.5rem;
+  text-wrap: balance;
+}
+
+h1 {
+  font-size: 2.6rem;
+}
+
+h2 {
+  font-size: 2.1rem;
+}
+
+p {
+  margin: 0 0 0.75rem;
+}
+
+a {
+  color: var(--ink);
+  text-decoration-style: wavy;
+  text-underline-offset: 3px;
+}
+
+kbd {
+  font-family: var(--font-body);
+  font-size: 0.95em;
+  padding: 0 0.35em;
+  border: 1.5px solid var(--ink);
+  border-radius: var(--wobble-b);
+  box-shadow: 1px 2px 0 var(--ink);
+  white-space: nowrap;
+}
+
+.muted {
+  color: var(--ink-soft);
+}
+.small {
+  font-size: 0.95rem;
+}
+.center {
+  text-align: center;
+}
+
+.sketch-defs {
+  position: absolute;
+  width: 0;
+  height: 0;
+  overflow: hidden;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+:focus-visible {
+  outline: 2px dashed var(--ink);
+  outline-offset: 4px;
+}
+
+/* ---------------------------------------------------------------------------
+ * Hand-drawn boxes: the outline and fill live on ::before, which goes through
+ * the sketch filter; the element's own text stays crisp.
+ * ------------------------------------------------------------------------- */
+.card,
+.btn,
+.mode,
+.seat,
+.result-banner,
+.banner,
+.chip,
+.tag,
+.badge,
+.pad,
+.lane,
+.brand-mark {
+  position: relative;
+  isolation: isolate;
+  --fill: transparent;
+  --line: 2px;
+  --shape: var(--wobble-a);
+}
+
+.card::before,
+.btn::before,
+.mode::before,
+.seat::before,
+.result-banner::before,
+.banner::before,
+.chip::before,
+.tag::before,
+.badge::before,
+.pad::before,
+.lane::before,
+.brand-mark::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border: var(--line) solid var(--ink);
+  border-radius: var(--shape);
+  background: var(--fill);
+  filter: url(#sketch);
+  pointer-events: none;
+}
+
+/* Layout */
+.shell {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+.topbar {
+  padding: 1rem 16px 0;
+  max-width: 760px;
+  width: 100%;
+  margin: 0 auto;
+}
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  color: var(--ink);
+  text-decoration: none;
+  font-family: var(--font-hand);
+  font-weight: 700;
+  font-size: 1.9rem;
+}
+.brand-mark {
+  --shape: var(--wobble-round);
+  display: inline-grid;
+  place-items: center;
+  width: 2.2rem;
+  height: 2.2rem;
+  font-family: var(--font-body);
+  font-size: 1.3rem;
+}
+.content {
+  width: 100%;
+  max-width: 580px;
+  margin: 0 auto;
+  padding: 1rem 16px 3rem;
+  flex: 1;
+}
+.content--wide {
+  max-width: 740px;
+}
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+.card {
+  padding: 1.75rem 1.5rem;
+}
+.card:nth-of-type(even) {
+  --shape: var(--wobble-b);
+}
+
+/* Controls */
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  color: var(--ink-soft);
+  text-align: left;
+  margin: 1rem 0;
+}
+.field input {
+  font: inherit;
+  font-size: 1.35rem;
+  color: var(--ink);
+  background: transparent;
+  border: 0;
+  border-bottom: 2px solid var(--ink);
+  border-radius: 0 0 4px 12px / 0 0 3px 6px;
+  padding: 0.3rem 0.15rem;
+}
+.field input::placeholder {
+  color: var(--ink-soft);
+}
+.field input:focus {
+  outline: none;
+  border-bottom-style: dashed;
+}
+
+.btn {
+  font: inherit;
+  font-size: 1.2rem;
+  color: var(--ink);
+  background: none;
+  border: 0;
+  padding: 0.6rem 1.4rem;
+  cursor: pointer;
+  text-decoration: none;
+  display: inline-block;
+  text-align: center;
+  transition: transform 0.08s ease;
+}
+.btn--primary {
+  --fill: var(--ink);
+  --line: 2.5px;
+  color: var(--paper);
+}
+.btn--ghost {
+  --shape: var(--wobble-b);
+}
+.btn:hover {
+  transform: translate(-1px, -2px) rotate(-0.6deg);
+}
+.btn:active {
+  transform: translate(1px, 1px);
+}
+.btn--small {
+  --fill: var(--ink);
+  color: var(--paper);
+  font-size: 1rem;
+  padding: 0.35rem 0.9rem;
+}
+
+.chips {
+  border: 0;
+  padding: 0;
+  margin: 0.5rem 0 1.25rem;
+  display: flex;
+  gap: 0.6rem;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+.chip {
+  --shape: var(--wobble-round);
+  font: inherit;
+  font-size: 1.25rem;
+  width: 2.8rem;
+  height: 2.8rem;
+  color: var(--ink);
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+.chip--on {
+  --fill: var(--ink);
+  --line: 2.5px;
+  color: var(--paper);
+}
+
+.banner {
+  --fill: var(--wash);
+  --shape: var(--wobble-b);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.7rem 1rem;
+  margin-bottom: 1.25rem;
+}
+
+.tag {
+  --line: 1.5px;
+  --shape: var(--wobble-b);
+  font-size: 0.8rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  padding: 0.05rem 0.5rem;
+  margin-left: 0.5rem;
+  vertical-align: middle;
+}
+.tag--out::before {
+  border-style: dashed;
+}
+.badge {
+  --fill: var(--ink);
+  --line: 1.5px;
+  --shape: var(--wobble-b);
+  color: var(--paper);
+  font-size: 0.95rem;
+  padding: 0.05rem 0.55rem;
+  margin-left: 0.5rem;
+  vertical-align: middle;
+}
+
+/* Squiggly underline, drawn with a mask so it takes the ink colour. */
+.accent,
+.round-headline--record {
+  position: relative;
+  white-space: nowrap;
+}
+.accent::after,
+.round-headline--record::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -0.12em;
+  height: 0.28em;
+  background: var(--ink);
+  -webkit-mask:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 12' preserveAspectRatio='none'%3E%3Cpath d='M2 7 Q 9 1 16 7 T 30 7 T 44 7 T 58 7 T 72 7 T 86 7 T 98 6' fill='none' stroke='black' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E")
+    center / 100% 100% no-repeat;
+  mask:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 12' preserveAspectRatio='none'%3E%3Cpath d='M2 7 Q 9 1 16 7 T 30 7 T 44 7 T 58 7 T 72 7 T 86 7 T 98 6' fill='none' stroke='black' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E")
+    center / 100% 100% no-repeat;
+}
+.round-headline--record::after {
+  left: 15%;
+  right: 15%;
+}
+
+/* Home */
+.hero {
+  margin: 0.5rem 0 1.75rem;
+}
+.staff-doodle {
+  display: block;
+  width: 100%;
+  max-width: 340px;
+  height: auto;
+  color: var(--ink);
+  margin: 0 0 0.25rem -4px;
+}
+.hero-title {
+  font-size: clamp(2.6rem, 9vw, 3.6rem);
+}
+.hero-sub {
+  font-size: 1.2rem;
+}
+.modes {
+  display: grid;
+  gap: 1rem;
+}
+.mode {
+  font: inherit;
+  text-align: left;
+  color: var(--ink);
+  background: none;
+  border: 0;
+  padding: 1.1rem 1.35rem;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  transition: transform 0.1s ease;
+}
+.mode:nth-child(odd) {
+  transform: rotate(-0.5deg);
+}
+.mode:nth-child(even) {
+  --shape: var(--wobble-c);
+  transform: rotate(0.4deg);
+}
+.mode:hover {
+  transform: translate(-1px, -3px) rotate(0deg);
+}
+.mode--primary {
+  --line: 3px;
+}
+.mode--primary::before {
+  box-shadow: 5px 6px 0 var(--ink);
+}
+.mode-title {
+  font-family: var(--font-hand);
+  font-weight: 700;
+  font-size: 2rem;
+  line-height: 1.1;
+}
+.mode-desc {
+  color: var(--ink-soft);
+}
+.howto {
+  margin-top: 2.5rem;
+}
+.howto ol {
+  padding-left: 1.4rem;
+}
+.howto li {
+  margin-bottom: 0.6rem;
+}
+
+/* Lobby */
+.big-number {
+  font-family: var(--font-hand);
+  font-weight: 700;
+  font-size: 5.5rem;
+  line-height: 1;
+  margin: 0.25rem 0 0.5rem;
+  font-variant-numeric: tabular-nums;
+}
+.seats {
+  list-style: none;
+  padding: 0;
+  margin: 1.25rem 0 1.5rem;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  gap: 0.6rem;
+}
+.seat {
+  --line: 1.5px;
+  padding: 0.5rem 0.7rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.seat:nth-child(even) {
+  --shape: var(--wobble-b);
+}
+.seat--me {
+  --line: 2.5px;
+  --fill: var(--wash);
+}
+.seat--empty {
+  color: var(--ink-soft);
+}
+.seat--empty::before {
+  border-style: dashed;
+  border-color: var(--ink-soft);
+}
+.pulse {
+  animation: pulse 1.4s ease-in-out infinite;
+}
+@keyframes pulse {
+  50% {
+    opacity: 0.45;
+  }
+}
+
+/* Round: instructions up top, pads at the bottom where thumbs rest. */
+.round {
+  text-align: center;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  display: flex;
+  flex-direction: column;
+  min-height: calc(100dvh - 8.5rem);
+}
+.round-heading {
+  font-family: var(--font-hand);
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin-bottom: 0.25rem;
+}
+.round-headline {
+  font-size: 3.4rem;
+  display: inline-block;
+  margin: 0;
+}
+.round-hint {
+  min-height: 3em;
+  max-width: 34ch;
+  margin: 0.25rem auto 0.25rem;
+}
+
+.pads {
+  display: flex;
+  justify-content: center;
+  align-items: stretch;
+  gap: clamp(6px, 2vw, 12px);
+  margin: auto 0 0;
+  padding: 1rem 0 env(safe-area-inset-bottom);
+  touch-action: none;
+}
+.pad {
+  --pin: var(--ink);
+  font: inherit;
+  color: var(--ink);
+  background: none;
+  border: 0;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  touch-action: none;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+  user-select: none;
+}
+/* Listening: the sounding note is shaded in pencil. Playing: filled with ink. */
+.pad--preview.pad--on,
+.pad--listen.pad--on {
+  --fill: var(--hatch);
+}
+.pad--prepare.pad--on,
+.pad--record.pad--on {
+  --fill: var(--ink);
+  --pin: var(--paper);
+  color: var(--paper);
+}
+/* Not in play this round: a pencilled-in outline, unlocked in a later round. */
+.pad--idle {
+  opacity: 0.3;
+  cursor: default;
+}
+.pad--idle::before {
+  border-style: dashed;
+}
+
+/* One note: a big note head with a stem, filled in while you hold it. */
+.pads--single {
+  padding-bottom: calc(1.5rem + env(safe-area-inset-bottom));
+}
+.pads--single .pad {
+  --line: 4px;
+  --shape: var(--wobble-round);
+  width: min(62vw, 240px);
+  aspect-ratio: 1.3;
+}
+.pads--single .pad::before {
+  transform: rotate(-18deg);
+  filter: url(#sketch-strong);
+}
+.pads--single .pad::after {
+  content: "";
+  position: absolute;
+  right: 6%;
+  bottom: 50%;
+  width: 4px;
+  height: 72%;
+  background: var(--ink);
+  border-radius: 2px;
+  filter: url(#sketch-strong);
+}
+.pad-count {
+  font-family: var(--font-hand);
+  font-weight: 700;
+  font-size: 4.5rem;
+  pointer-events: none;
+}
+
+/*
+ * Four notes: xylophone bars, all the same size so every one is as easy to hit
+ * with a thumb. They fill the width of the screen and a good part of its height.
+ */
+.pads--bars .pad {
+  --line: 2.5px;
+  --shape: var(--wobble-b);
+  flex: 1 1 0;
+  max-width: 130px;
+  height: clamp(150px, 32dvh, 260px);
+}
+.pads--bars .pad:nth-child(even) {
+  --shape: var(--wobble-c);
+}
+.pads--bars .pad::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 50% 14px, var(--pin) 0 3.5px, transparent 4px),
+    radial-gradient(circle at 50% calc(100% - 14px), var(--pin) 0 3.5px, transparent 4px);
+}
+/* Higher notes sit higher on the bar, a reminder of which way is up. */
+.pad-label {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.15rem;
+  pointer-events: none;
+  align-self: end;
+  margin-bottom: 30%;
+}
+.pads--bars .pad:nth-child(2) .pad-label {
+  margin-bottom: 55%;
+}
+.pads--bars .pad:nth-child(3) .pad-label {
+  margin-bottom: 80%;
+}
+.pads--bars .pad:nth-child(4) .pad-label {
+  margin-bottom: 105%;
+}
+.pad-name {
+  font-family: var(--font-hand);
+  font-weight: 700;
+  font-size: 1.6rem;
+  line-height: 1;
+  padding: 0.1rem 0.35rem;
+  background: var(--paper);
+  color: var(--ink);
+  border-radius: var(--wobble-b);
+}
+.pad-key {
+  font-size: 0.85rem;
+  line-height: 1;
+  padding: 0.05rem 0.3rem;
+  background: var(--paper);
+  color: var(--ink-soft);
+  border-radius: var(--wobble-a);
+}
+.count-line {
+  font-family: var(--font-hand);
+  font-weight: 700;
+  font-size: 2.6rem;
+  line-height: 1;
+  min-height: 2.6rem;
+  margin: 0;
+}
+
+/* Rhythm lanes: a strip of staff paper with bar lines on each beat. */
+.lane-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin: 0.5rem 0;
+}
+.lane-label {
+  width: 3.5rem;
+  flex: none;
+  text-align: right;
+  font-family: var(--font-hand);
+  font-size: 1.3rem;
+  color: var(--ink-soft);
+}
+.lane {
+  --line: 1.5px;
+  --shape: 6px 10px 7px 12px / 12px 6px 10px 7px;
+  flex: 1;
+  min-width: 0;
+  height: 34px;
+}
+.lane-staff {
+  position: absolute;
+  left: 4px;
+  right: 4px;
+  height: 1px;
+  background: var(--rule);
+}
+.lane-beat {
+  position: absolute;
+  top: 4px;
+  bottom: 4px;
+  width: 1px;
+  background: color-mix(in srgb, var(--ink) 22%, transparent);
+}
+.lane-note {
+  position: absolute;
+  top: 8px;
+  bottom: 8px;
+  border-radius: 6px 3px 7px 4px / 4px 7px 3px 6px;
+  background: var(--ink);
+}
+.lane-note--good {
+  background: var(--good);
+}
+.lane-note--ok {
+  background: var(--ok);
+}
+.lane-note--bad {
+  background: var(--bad);
+}
+.lane-note--wrongKey {
+  background: repeating-linear-gradient(-45deg, var(--bad) 0 3px, transparent 3px 6px);
+  box-shadow: inset 0 0 0 1.5px var(--bad);
+}
+.lane-note--missed {
+  background: transparent;
+  border: 2px dashed var(--bad);
+}
+.lane-playhead {
+  position: absolute;
+  top: -3px;
+  bottom: -3px;
+  width: 2px;
+  background: var(--ink);
+}
+.compare {
+  margin: 1rem 0;
+}
+
+/* Results: the tune as outlined boxes, your notes drawn inside them. */
+.roll {
+  display: flex;
+  gap: 0.4rem;
+  height: 150px;
+}
+.roll--single {
+  height: 64px;
+}
+.roll-names {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-around;
+  padding: 6px 0;
+  font-family: var(--font-hand);
+  font-weight: 700;
+  font-size: 1.15rem;
+  line-height: 1;
+  color: var(--ink-soft);
+  text-align: right;
+  width: 2.2rem;
+  flex: none;
+}
+.roll-grid {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  margin: 6px 0;
+}
+.roll-row {
+  position: absolute;
+  left: 0;
+  right: 0;
+  border-radius: 4px;
+}
+/* Shade every other row, like the keys of a piano roll. */
+.roll-row:nth-child(odd) {
+  background: var(--wash);
+}
+.roll-beat {
+  position: absolute;
+  top: -4px;
+  bottom: -4px;
+  width: 1px;
+  background: color-mix(in srgb, var(--ink) 18%, transparent);
+}
+.roll-target {
+  position: absolute;
+  box-sizing: border-box;
+  border: 2px solid var(--ink);
+  border-radius: 6px 3px 7px 4px / 4px 7px 3px 6px;
+  min-width: 6px;
+}
+.roll-target--missed {
+  border: 2px dashed var(--bad);
+}
+.roll-target--wrongKey,
+.roll-target--early,
+.roll-target--late {
+  border-color: var(--bad);
+}
+/* The note the tip talks about. */
+.roll-target--focus {
+  box-shadow:
+    0 0 0 3px var(--paper),
+    0 0 0 5px var(--ink);
+  z-index: 1;
+}
+.roll-mark {
+  position: absolute;
+  z-index: 1;
+  right: -0.35rem;
+  top: -0.95rem;
+  font-family: var(--font-body);
+  font-size: 0.9rem;
+  font-weight: 700;
+  line-height: 1;
+  padding: 0 1px;
+  background: var(--paper);
+  border-radius: 4px;
+}
+.roll-target--good .roll-mark {
+  color: var(--good);
+}
+.roll-target--ok .roll-mark {
+  color: var(--ok);
+}
+.roll-target--early .roll-mark,
+.roll-target--late .roll-mark,
+.roll-target--wrongKey .roll-mark,
+.roll-target--missed .roll-mark {
+  color: var(--bad);
+}
+.roll-played {
+  position: absolute;
+  border-radius: 4px 2px 5px 3px / 3px 5px 2px 4px;
+  background: var(--ink);
+}
+.roll-played--good {
+  background: var(--good);
+}
+.roll-played--ok {
+  background: var(--ok);
+}
+.roll-played--early,
+.roll-played--late,
+.roll-played--wrongKey {
+  background: var(--bad);
+}
+.roll-played--extra {
+  background: repeating-linear-gradient(-45deg, var(--ink-soft) 0 2px, transparent 2px 5px);
+  box-shadow: inset 0 0 0 1.5px var(--ink-soft);
+}
+.roll-link {
+  position: absolute;
+  width: 0;
+  border-left: 2px dotted var(--bad);
+}
+.roll-legend {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.2rem 0.9rem;
+  list-style: none;
+  padding: 0;
+  margin: 0.6rem 0 0;
+  font-size: 0.95rem;
+  color: var(--ink-soft);
+}
+.swatch {
+  display: inline-block;
+  width: 1.2rem;
+  height: 0.7rem;
+  vertical-align: -0.05rem;
+  border-radius: 3px;
+}
+.swatch--target {
+  border: 2px solid var(--ink);
+}
+.swatch--played {
+  background: var(--good);
+  height: 0.4rem;
+}
+.swatch--extra {
+  background: repeating-linear-gradient(-45deg, var(--ink-soft) 0 2px, transparent 2px 5px);
+  box-shadow: inset 0 0 0 1.5px var(--ink-soft);
+}
+.compare-tip {
+  text-align: center;
+  font-family: var(--font-hand);
+  font-weight: 700;
+  font-size: 1.45rem;
+  line-height: 1.2;
+  margin: 0.8rem auto 0;
+  max-width: 30ch;
+}
+.compare-summary {
+  text-align: center;
+  color: var(--ink-soft);
+  margin-top: 0.3rem;
+}
+
+/* Results */
+.results {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+.result-banner {
+  text-align: center;
+  padding: 1.4rem 1.25rem;
+}
+.result-banner h1 {
+  font-size: 3.2rem;
+}
+.result-banner--safe {
+  --line: 2.5px;
+}
+/* Knocked out: a rubber stamp. */
+.result-banner--out h1 {
+  display: inline-block;
+  color: var(--bad);
+  border: 4px double var(--bad);
+  border-radius: 6px 10px 5px 12px;
+  padding: 0.1rem 0.8rem 0.2rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-size: 2.6rem;
+  transform: rotate(-4deg);
+}
+/* Winner: a double outline and a couple of doodled stars. */
+.result-banner--win {
+  --line: 3px;
+}
+.result-banner--win::after {
+  content: "";
+  position: absolute;
+  inset: 7px;
+  z-index: -1;
+  border: 1.5px solid var(--ink);
+  border-radius: var(--wobble-b);
+  filter: url(#sketch);
+}
+.result-banner--win h1::before,
+.result-banner--win h1::after {
+  content: "\2605";
+  font-size: 0.6em;
+  margin: 0 0.3em;
+  vertical-align: middle;
+}
+.emoji-row {
+  font-size: 1.6rem;
+  letter-spacing: 0.15em;
+}
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.9rem;
+  justify-content: center;
+  align-items: center;
+  margin: 1rem 0;
+}
+.actions p {
+  margin: 0;
+  width: 100%;
+  text-align: center;
+}
+.scoreboard {
+  width: 100%;
+  border-collapse: collapse;
+}
+.scoreboard th,
+.scoreboard td {
+  padding: 0.45rem 0.6rem;
+  text-align: left;
+}
+.scoreboard th {
+  font-family: var(--font-hand);
+  font-weight: 700;
+  font-size: 1.4rem;
+  border-bottom: 2px solid var(--ink);
+}
+.scoreboard td {
+  border-bottom: 1.5px dashed var(--rule);
+}
+.scoreboard .num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.scoreboard tr.out td {
+  color: var(--ink-soft);
+}
+/* Knocked-out players are crossed off the list. */
+.scoreboard tr.out td:nth-child(2) {
+  text-decoration: line-through;
+  text-decoration-thickness: 2px;
+}
+.scoreboard tr.me td {
+  background: var(--wash);
+}
+.section-title {
+  margin-top: 1.75rem;
+}
+.daily-review p {
+  margin: 0.9rem 0 0;
+}
+.share-text {
+  font: inherit;
+  width: 100%;
+  color: var(--ink);
+  background: transparent;
+  border: 2px dashed var(--ink);
+  border-radius: var(--wobble-b);
+  padding: 0.6rem 0.8rem;
+  resize: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pulse {
+    animation: none;
+  }
+  .mode,
+  .btn {
+    transition: none;
+  }
+}
+
+/* Private rooms */
+.room-code {
+  font-size: 3.2rem;
+  letter-spacing: 0.12em;
+  margin: 0.1rem 0 0.75rem;
+}
+.invite {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  align-items: center;
+}
+.invite-link {
+  font: inherit;
+  font-size: 1rem;
+  width: 100%;
+  max-width: 24rem;
+  text-align: center;
+  color: var(--ink-soft);
+  background: var(--wash);
+  border: 0;
+  border-radius: var(--wobble-b);
+  padding: 0.45rem 0.75rem;
+}
+.invite-actions {
+  margin-bottom: 0.75rem;
+  display: flex;
+  gap: 0.5rem;
+  justify-content: center;
+}
+.chips legend {
+  width: 100%;
+  text-align: center;
+  margin-bottom: 0.4rem;
+}
+.chip--wide {
+  --shape: var(--wobble-b);
+  width: auto;
+  height: auto;
+  padding: 0.35rem 1rem;
+  font-size: 1.1rem;
+}
+.room-controls {
+  align-items: center;
+}
+.room-controls .chips {
+  margin-bottom: 0;
+}
+.room-controls p {
+  margin: 0;
+}
+.room-controls .btn {
+  min-width: 12rem;
+}
+.btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.host-mark {
+  color: var(--ok);
+}
+.choice-note {
+  margin: -0.5rem 0 0.25rem;
+}
+.link-button {
+  font: inherit;
+  color: var(--ink);
+  background: none;
+  border: 0;
+  padding: 0;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+/* Small outlined buttons (e.g. "Share…", "Got it") next to a filled one. */
+.btn--small.btn--ghost {
+  --fill: transparent;
+  color: var(--ink);
+}
+
+/* Tap sounds on/off: tucked in the corner of every round. */
+.round-top {
+  position: relative;
+}
+.sound-toggle {
+  font: inherit;
+  font-size: 0.9rem;
+  color: var(--ink-soft);
+  background: none;
+  border: 0;
+  padding: 0.2rem 0;
+  cursor: pointer;
+  display: block;
+  margin: 0 0 0.25rem auto;
+}
+.sound-toggle:hover {
+  color: var(--ink);
+}
+
+/* Bluetooth headphones: what to expect and how to play with them. */
+.latency-note {
+  text-align: left;
+  margin-bottom: 0.75rem;
+}
+.latency-note p {
+  margin: 0;
+  flex: 1 1 16rem;
+  font-size: 1rem;
+  line-height: 1.35;
+}
+.latency-actions {
+  display: flex;
+  gap: 0.5rem;
 }

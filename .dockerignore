@@ -1,0 +1,7 @@
+**/node_modules
+**/dist
+frontend/dist-offline
+.git
+.github
+**/*.log
+**/.env*

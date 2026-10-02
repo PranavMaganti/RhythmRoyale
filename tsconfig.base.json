@@ -1,0 +1,18 @@
+{
+  "compilerOptions": {
+    "target": "es2023",
+    "lib": ["es2023"],
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "strict": true,
+    "noFallthroughCasesInSwitch": true,
+    "verbatimModuleSyntax": true,
+    "isolatedModules": true,
+    "skipLibCheck": true,
+    "sourceMap": true,
+    // Workspace packages resolve to their TypeScript source, so nothing has
+    // to be built before type-checking, testing or running in dev mode.
+    "customConditions": ["source"],
+    "types": []
+  }
+}

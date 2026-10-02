@@ -1,99 +1,119 @@
-import { FormEvent, useCallback, useState } from "react";
-import Button from "react-bootstrap/Button";
-import Form from "react-bootstrap/Form";
-import { useNavigate } from "react-router-dom";
-import { backendUrl } from "../config";
+import { DAILY_DIFFICULTIES, dailyKey, dailyNumber } from "@rhythm-royale/common";
+import { useState } from "react";
+import { useNavigate } from "react-router";
+import Shell from "../components/Shell";
+import { StaffDoodle } from "../components/Sketch";
+import { OFFLINE } from "../config";
+import { unlockAudio } from "../lib/audio";
+import { load, loadName, saveName } from "../lib/storage";
+import type { DailyProgress } from "./Daily";
 
-function Home() {
+export default function Home() {
   const navigate = useNavigate();
-  const [name, setName] = useState("");
-  const [findingRoom, setFindingRoom] = useState(false);
-  const [error, setError] = useState(false);
+  const [name, setName] = useState(loadName());
+  const today = dailyKey();
+  const daily = load<DailyProgress | null>(`daily:${today}`, null);
+  const dailyDone = daily?.scores.length === DAILY_DIFFICULTIES.length;
+  const dailyTotal = daily?.scores.reduce((a, b) => a + b, 0) ?? 0;
 
-  // useEffect(() => {
-  //   convertToSound(
-  //     [
-  //       { type: "beat", duration: 1000 },
-  //       { type: "gap", duration: 500 },
-  //       { type: "beat", duration: 2000 },
-  //       { type: "gap", duration: 500 },
-  //       { type: "beat", duration: 1000 },
-  //     ],
-  //     new Tone.PolySynth(Tone.Synth).toDestination()
-  //   );
-  // });
-
-  const onFormSubmit = useCallback(
-    async (e: FormEvent) => {
-      e.preventDefault();
-      setFindingRoom(true);
-      const res = await fetch(
-        `${backendUrl}/api/room?${new URLSearchParams({ name: name })}`
-      );
-
-      if (res.status === 200) {
-        navigate(
-          `/game/${await res.text()}?${new URLSearchParams({ name: name })}`
-        );
-      } else {
-        setError(true);
-      }
-    },
-    [name, navigate]
-  );
-
-  if (error) {
-    return <p>Failed to find a room please try again later</p>;
-  }
-
-  if (findingRoom) {
-    return <p>Finding a room ...</p>;
-  }
+  const go = async (path: string) => {
+    saveName(name);
+    // Clicking is the user gesture browsers require before they will play sound.
+    await unlockAudio().catch(() => undefined);
+    navigate(path);
+  };
 
   return (
-    <div
-      style={{
-        height: "100vh",
-        display: "flex",
-        justifyContent: "center",
-        alignItems: "center",
-      }}
-    >
-      <Form
-        onSubmit={onFormSubmit}
-        style={{
-          width: "30%",
-          display: "flex",
-          flexDirection: "column",
-          justifyContent: "center",
-          alignItems: "center",
-        }}
-      >
-        <h1 style={{ fontSize: "70px" }}>Rhythm Royale</h1>
-        <div style={{ height: "2vh" }} />
-        <Form.Control
-          size="lg"
-          type="text"
-          placeholder="Nickname"
-          onChange={({ target: { value } }) => setName(value)}
-          value={name}
-          style={{
-            width: "100%",
-          }}
-        />
-        <div style={{ height: "1vh" }} />
-        <Button
-          type="submit"
-          variant="success"
-          style={{
-            width: "100%",
-          }}
+    <Shell>
+      <section className="hero">
+        <StaffDoodle />
+        <h1 className="hero-title">
+          Hear it. <span className="accent">Play it.</span> Outlast everyone.
+        </h1>
+        <p className="muted hero-sub">
+          Each round plays a short melody. Play it back as precisely as you can. The least accurate
+          players are knocked out, and the tunes use more notes each round, up to four.
+        </p>
+        <label className="field">
+          <span>Nickname</span>
+          <input
+            value={name}
+            maxLength={16}
+            placeholder="Your name"
+            onChange={(e) => setName(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") go(OFFLINE ? "/royale" : "/royale?mode=quick");
+            }}
+          />
+        </label>
+      </section>
+
+      <section className="modes">
+        <button
+          type="button"
+          className="mode mode--primary"
+          onClick={() => go(OFFLINE ? "/royale" : "/royale?mode=quick")}
         >
-          Play
-        </Button>
-      </Form>
-    </div>
+          <span className="mode-title">{OFFLINE ? "Battle Royale" : "Quick match"}</span>
+          <span className="mode-desc">
+            {OFFLINE
+              ? "You against nine bots. Last one standing wins."
+              : "Join a public lobby: up to 10 players, bots fill the empty seats after a short countdown. Last one standing wins."}
+          </span>
+        </button>
+        {!OFFLINE && (
+          <button type="button" className="mode" onClick={() => go("/royale?mode=private")}>
+            <span className="mode-title">Play with friends</span>
+            <span className="mode-desc">
+              Open a private room, send the invite link, and start when everyone's in. With or
+              without bots.
+            </span>
+          </button>
+        )}
+        <button type="button" className="mode" onClick={() => go("/daily")}>
+          <span className="mode-title">
+            Daily #{dailyNumber(today)}
+            {dailyDone && (
+              <span className="badge">
+                {dailyTotal}/{DAILY_DIFFICULTIES.length * 100}
+              </span>
+            )}
+          </span>
+          <span className="mode-desc">
+            {dailyDone
+              ? "Done for today. See how you compare and share your result."
+              : "Five rhythms, the same for everyone, one attempt each."}
+          </span>
+        </button>
+        <button type="button" className="mode" onClick={() => go("/practice")}>
+          <span className="mode-title">Practice</span>
+          <span className="mode-desc">Pick a difficulty and replay as often as you like.</span>
+        </button>
+      </section>
+
+      <section className="howto">
+        <h2>How to play</h2>
+        <ol>
+          <li>
+            <strong>Listen.</strong> When there&apos;s more than one note, you first hear each one
+            from low to high. Then four clicks count you in and the melody plays once.
+          </li>
+          <li>
+            <strong>Play it back.</strong> After another count-in, hold each note&apos;s key for as
+            long as it sounded. On a phone, hold the pads with your thumbs: do, re, mi and sol, low
+            to high. On a keyboard, use <kbd>Space</kbd> for one note, then <kbd>D</kbd>{" "}
+            <kbd>F</kbd> <kbd>J</kbd> <kbd>K</kbd>.
+          </li>
+          <li>
+            <strong>Survive.</strong> Timing matters most, then pressing the right note, then how
+            long you hold it. A steady delay from your headphones or device isn&apos;t held against
+            you.
+          </li>
+        </ol>
+        <p className="muted small">
+          Tip: use wired headphones, and turn off silent mode on iPhone.
+        </p>
+      </section>
+    </Shell>
   );
 }
-
-export default Home;

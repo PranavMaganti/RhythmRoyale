@@ -1,0 +1,313 @@
+import {
+  activeLanes,
+  beatMs,
+  COUNT_IN_BEATS,
+  LEAD_IN_MS,
+  type Note,
+  padNames,
+  pitchNames,
+  REFERENCE_NOTE_MS,
+  REFERENCE_STEP_MS,
+  type Rhythm,
+  referenceMs,
+  rhythmLengthMs,
+} from "@rhythm-royale/common";
+import { type ReactNode, useEffect, useRef, useState } from "react";
+import * as Tone from "tone";
+import { useTapRecorder } from "../hooks/useTapRecorder";
+import {
+  createInstruments,
+  HIGH_LATENCY_MS,
+  type Instruments,
+  outputLatencyMs,
+} from "../lib/audio";
+import { isTouchDevice, keyLabel, laneKeys } from "../lib/keys";
+import { loadTapSounds, saveTapSounds } from "../lib/storage";
+import RhythmLane from "./RhythmLane";
+
+/** Once someone has read the headphone note, don't repeat it every round. */
+let latencyNoteDismissed = false;
+
+type Phase = "preview" | "listen" | "prepare" | "record" | "done";
+
+interface Props {
+  rhythm: Rhythm;
+  onComplete: (notes: Note[]) => void;
+  /** Shown above the pads, e.g. "Round 3 · 7 players left". */
+  heading?: ReactNode;
+}
+
+const HEADLINES: Record<Phase, string> = {
+  preview: "Your notes",
+  listen: "Listen",
+  prepare: "Your turn",
+  record: "Go!",
+  done: "Nice!",
+};
+
+/**
+ * One full round: a preview of the available pitches, a count-in and the
+ * phrase, then a count-in and the player's attempt. Everything is scheduled
+ * on the audio clock so the metronome, the phrase and the recording window
+ * all line up.
+ */
+export default function RoundPlayer({ rhythm, onComplete, heading }: Props) {
+  const multi = rhythm.pitches > 1;
+  const [phase, setPhase] = useState<Phase>(multi ? "preview" : "listen");
+  const [count, setCount] = useState<number | null>(null);
+  const [lit, setLit] = useState<number | null>(null);
+  const [playhead, setPlayhead] = useState<number | undefined>(undefined);
+  const instruments = useRef<Instruments | null>(null);
+  const onCompleteRef = useRef(onComplete);
+  onCompleteRef.current = onComplete;
+  const [tapSounds, setTapSounds] = useState(loadTapSounds);
+  const tapSoundsRef = useRef(tapSounds);
+  tapSoundsRef.current = tapSounds;
+  const toggleTapSounds = () => {
+    saveTapSounds(!tapSounds);
+    setTapSounds(!tapSounds);
+  };
+  // High output latency (Bluetooth headphones): explain what to expect.
+  const [latency, setLatency] = useState<number | null>(null);
+  useEffect(() => {
+    let live = true;
+    outputLatencyMs().then((ms) => {
+      if (live && !latencyNoteDismissed && ms !== null && ms >= HIGH_LATENCY_MS) setLatency(ms);
+    });
+    return () => {
+      live = false;
+    };
+  }, []);
+  const dismissLatencyNote = () => {
+    latencyNoteDismissed = true;
+    setLatency(null);
+  };
+
+  const names = pitchNames(rhythm.pitches);
+  const lanes = activeLanes(rhythm);
+  const beat = beatMs(rhythm.bpm);
+  const recording = phase === "prepare" || phase === "record";
+  const recorder = useTapRecorder({
+    enabled: recording,
+    pitches: rhythm.pitches,
+    lanes,
+    earlyToleranceMs: beat / 2,
+    // Tone.js schedules into the future by default (its lookAhead, 100 ms), which
+    // is right for the tune but makes your own presses sound late. Play them now.
+    onPress: (lane) => {
+      if (tapSoundsRef.current) {
+        instruments.current?.echo.triggerAttack(names[lane], Tone.immediate());
+      }
+      // A tiny buzz confirms the press on phones that support it (not iOS).
+      navigator.vibrate?.(8);
+    },
+    // Always release, so switching sounds off mid-note can't leave one ringing.
+    onRelease: (lane) => instruments.current?.echo.triggerRelease(names[lane], Tone.immediate()),
+  });
+  const { arm, finish } = recorder;
+
+  useEffect(() => {
+    const inst = createInstruments();
+    instruments.current = inst;
+    const ctx = Tone.getContext();
+    const drawer = Tone.getDraw();
+    const notes = pitchNames(rhythm.pitches);
+    const b = beatMs(rhythm.bpm) / 1000;
+    let cancelled = false;
+    const draw = (time: number, fn: () => void) => drawer.schedule(() => !cancelled && fn(), time);
+    const toPerf = (time: number) => performance.now() + (time - ctx.currentTime) * 1000;
+
+    const countIn = (from: number) => {
+      for (let i = 0; i < COUNT_IN_BEATS; i++) {
+        inst.click.triggerAttackRelease(i === 0 ? "C4" : "G3", "32n", from + i * b);
+        draw(from + i * b, () => setCount(COUNT_IN_BEATS - i));
+      }
+    };
+    const metronome = (from: number) => {
+      for (let i = 0; i < rhythm.beats; i++) {
+        inst.click.triggerAttackRelease("G2", "32n", from + i * b, 0.5);
+      }
+    };
+
+    // Preview: each pad in play, low to high, so players know what to listen for.
+    const start = Tone.now() + LEAD_IN_MS / 1000;
+    const inPlay = activeLanes(rhythm);
+    if (inPlay.length > 1) {
+      inPlay.forEach((lane, i) => {
+        const at = start + (i * REFERENCE_STEP_MS) / 1000;
+        inst.voice.triggerAttackRelease(notes[lane], REFERENCE_NOTE_MS / 1000, at);
+        draw(at, () => setLit(lane));
+        draw(at + REFERENCE_NOTE_MS / 1000, () => setLit(null));
+      });
+    }
+
+    // Listen: count-in, then the phrase.
+    const listenStart = start + referenceMs(inPlay.length) / 1000;
+    draw(listenStart, () => setPhase("listen"));
+    countIn(listenStart);
+    const phraseStart = listenStart + COUNT_IN_BEATS * b;
+    draw(phraseStart, () => setCount(null));
+    metronome(phraseStart);
+    for (const n of rhythm.notes) {
+      const at = phraseStart + n.start / 1000;
+      inst.voice.triggerAttackRelease(notes[n.pitch] ?? notes[0], n.duration / 1000, at);
+      draw(at, () => setLit(n.pitch));
+      draw(at + n.duration / 1000, () => setLit(null));
+    }
+
+    // Record: count-in, then the player's turn.
+    const prepareStart = phraseStart + (rhythm.beats + 1) * b;
+    draw(prepareStart, () => setPhase("prepare"));
+    countIn(prepareStart);
+    const origin = prepareStart + COUNT_IN_BEATS * b;
+    const end = origin + (rhythm.beats + 1) * b;
+    const originPerf = toPerf(origin);
+    arm(originPerf);
+    draw(origin, () => {
+      setCount(null);
+      setPhase("record");
+    });
+    metronome(origin);
+
+    let frame = 0;
+    const tick = () => {
+      if (cancelled) return;
+      const elapsed = performance.now() - originPerf;
+      setPlayhead(elapsed >= 0 ? elapsed : undefined);
+      frame = requestAnimationFrame(tick);
+    };
+    const tickTimer = setTimeout(tick, Math.max(0, originPerf - performance.now()));
+
+    const doneTimer = setTimeout(
+      () => {
+        cancelled = true;
+        cancelAnimationFrame(frame);
+        const notes = finish();
+        setPhase("done");
+        onCompleteRef.current(notes);
+      },
+      Math.max(0, toPerf(end) - performance.now()),
+    );
+
+    return () => {
+      cancelled = true;
+      clearTimeout(tickTimer);
+      clearTimeout(doneTimer);
+      cancelAnimationFrame(frame);
+      instruments.current = null;
+      inst.dispose();
+    };
+  }, [rhythm, arm, finish]);
+
+  const keys = laneKeys(rhythm.pitches);
+  const labels = padNames(rhythm.pitches);
+  const touch = isTouchDevice();
+  const keyList = lanes.map((lane) => keyLabel(keys[lane])).join(" ");
+  const noteList = lanes.map((lane) => labels[lane]).join(", ");
+  const howMany = ["", "one", "two", "three", "four"][lanes.length] ?? String(lanes.length);
+  const hints: Record<Phase, string> = {
+    preview: touch
+      ? `This round uses ${howMany} notes, low to high: ${noteList}.`
+      : `This round uses ${howMany} notes, low to high: ${keyList}.`,
+    listen: multi
+      ? "Memorise the tune: which note, when, and for how long."
+      : "Memorise the rhythm: one tone per press, held for as long as it sounds.",
+    prepare: "Get ready to play it back.",
+    record: touch
+      ? `Hold ${multi ? "a pad" : "the pad"} for each note, as long as it sounded.`
+      : multi
+        ? `Hold ${keyList} (or tap the pads) for each note.`
+        : "Hold SPACE or the pad for each note.",
+    done: "Scoring…",
+  };
+
+  const lengthMs = rhythmLengthMs(rhythm) + beat;
+  const isLit = (lane: number) =>
+    phase === "preview" || phase === "listen" ? lit === lane : recorder.held.has(lane);
+  // Notes you've finished, plus the ones you're holding, growing up to the
+  // playhead, so you can see how long you've held without hearing yourself.
+  const liveNotes = [
+    ...recorder.notes,
+    ...Array.from(recorder.held, ([pitch, start]) => ({
+      start,
+      duration: Math.max(0, (playhead ?? start) - start),
+      pitch,
+    })),
+  ].map((n) => ({ ...n, tone: "live" as const }));
+
+  return (
+    <div className="round">
+      <div className="round-top">
+        <button
+          type="button"
+          className="sound-toggle"
+          aria-pressed={tapSounds}
+          onClick={toggleTapSounds}
+          title="Play a note when you press a pad"
+        >
+          {tapSounds ? "🔊 Tap sounds on" : "🔇 Tap sounds off"}
+        </button>
+        {latency !== null && tapSounds && phase !== "record" && (
+          <div className="banner latency-note" role="note">
+            <p>
+              🎧 Your headphones delay sound by about {latency} ms. Play to the beat you hear; your
+              own taps will sound late, and that&apos;s fine.
+            </p>
+            <div className="latency-actions">
+              {tapSounds && (
+                <button type="button" className="btn btn--small" onClick={toggleTapSounds}>
+                  Mute my taps
+                </button>
+              )}
+              <button
+                type="button"
+                className="btn btn--small btn--ghost"
+                onClick={dismissLatencyNote}
+              >
+                Got it
+              </button>
+            </div>
+          </div>
+        )}
+        {heading && <div className="round-heading">{heading}</div>}
+        <h2 className={`round-headline round-headline--${phase}`}>{HEADLINES[phase]}</h2>
+        <p className="muted round-hint">{hints[phase]}</p>
+        {multi && <p className="count-line">{count ?? " "}</p>}
+      </div>
+      <RhythmLane
+        label={recording ? "You" : undefined}
+        notes={liveNotes}
+        pitches={rhythm.pitches}
+        lengthMs={lengthMs}
+        beatMs={beat}
+        playheadMs={phase === "record" ? playhead : undefined}
+      />
+      <div className={`pads ${multi ? "pads--bars" : "pads--single"}`}>
+        {keys.map((key, lane) => {
+          // Pads not in play this round stay in place (so thumbs learn where
+          // each note lives) but are faded and do nothing.
+          const idle = !lanes.includes(lane);
+          return (
+            <button
+              key={key}
+              type="button"
+              className={`pad pad--${phase}${isLit(lane) ? " pad--on" : ""}${idle ? " pad--idle" : ""}`}
+              aria-label={`${multi ? `${labels[lane]}, note ${lane + 1} of ${rhythm.pitches}` : "Tap pad"} (${keyLabel(key)})`}
+              aria-disabled={idle || undefined}
+              tabIndex={-1}
+              {...(idle ? {} : recorder.padHandlers(lane))}
+            >
+              {!multi && <span className="pad-count">{count ?? ""}</span>}
+              {multi && (
+                <span className="pad-label">
+                  <span className="pad-name">{labels[lane]}</span>
+                  {!touch && <span className="pad-key">{keyLabel(key)}</span>}
+                </span>
+              )}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}

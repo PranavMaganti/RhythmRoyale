@@ -1,5 +1,5 @@
-name: 'build-test'
-on: 
+name: build-test
+on:
   pull_request:
   push:
     branches:
@@ -8,30 +8,51 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
-      - name: Setup Node.js
-        uses: actions/setup-node@v1
-        with:
-          node-version: "17.3.0"
-
-      - name: Cache node modules
-        uses: actions/cache@v2
+    services:
+      # Runs the daily leaderboard tests against real Postgres as well as memory.
+      postgres:
+        image: postgres:17-alpine
         env:
-          cache-name: cache-node-modules
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: rhythm_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      TEST_DATABASE_URL: postgres://postgres:test@localhost:5432/rhythm_test
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
-          path: ~/.npm
-          key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ hashFiles('**/yarn.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-build-${{ env.cache-name }}-
-            ${{ runner.os }}-build-
-            ${{ runner.os }}-
+          node-version: "24"
 
-      - name: Install Dependencies
-        run: yarn --cwd common install
+      # pnpm version comes from `packageManager` in package.json.
+      - name: Enable pnpm
+        run: corepack enable
 
-      - name: Check build/types
-        run: yarn --cwd common build
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
 
-      - name: Run the tests
-        run: yarn --cwd common test
+      - name: Lint and format check
+        run: pnpm lint
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Test
+        run: pnpm test
+
+      - name: Build
+        run: pnpm build && pnpm build:offline
+
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build the production image
+        run: docker build -t rhythm-royale .
