@@ -3,7 +3,8 @@ import { generateRhythm, type Rhythm } from "./rhythm.js";
 
 /** Difficulty of each rhythm in the daily set, easiest first. */
 export const DAILY_DIFFICULTIES = [1, 2, 3, 4, 5];
-const DAILY_EPOCH = Date.UTC(2026, 0, 1);
+/** Daily #1: the day the daily challenge launched. */
+const DAILY_EPOCH = Date.UTC(2026, 9, 2);
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 /** The daily puzzle rolls over at midnight UTC so everyone shares the same one. */

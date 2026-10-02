@@ -61,12 +61,14 @@ export default function RoundPlayer({ rhythm, onComplete, heading }: Props) {
     pitches: rhythm.pitches,
     lanes,
     earlyToleranceMs: beat / 2,
+    // Tone.js schedules into the future by default (its lookAhead, 100 ms), which
+    // is right for the tune but makes your own presses sound late. Play them now.
     onPress: (lane) => {
-      instruments.current?.echo.triggerAttack(names[lane]);
+      instruments.current?.echo.triggerAttack(names[lane], Tone.immediate());
       // A tiny buzz confirms the press on phones that support it (not iOS).
       navigator.vibrate?.(8);
     },
-    onRelease: (lane) => instruments.current?.echo.triggerRelease(names[lane]),
+    onRelease: (lane) => instruments.current?.echo.triggerRelease(names[lane], Tone.immediate()),
   });
   const { arm, finish } = recorder;
 

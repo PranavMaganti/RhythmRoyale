@@ -26,8 +26,15 @@ describe("daily challenge", () => {
   });
 
   test("numbers count up from the first daily", () => {
-    expect(dailyNumber("2026-01-01")).toBe(1);
-    expect(dailyNumber("2026-01-02")).toBe(2);
+    expect(dailyNumber("2026-10-02")).toBe(1);
+    expect(dailyNumber("2026-10-03")).toBe(2);
+    expect(dailyNumber("2027-10-02")).toBe(366);
+  });
+
+  test("every melody changes from one day to the next", () => {
+    const today = dailyRhythms("2026-10-02");
+    const tomorrow = dailyRhythms("2026-10-03");
+    today.forEach((rhythm, i) => expect(tomorrow[i].notes).not.toEqual(rhythm.notes));
   });
 
   test("time until the next daily", () => {
@@ -38,7 +45,7 @@ describe("daily challenge", () => {
     expect(scoreEmoji(90)).toBe("🟩");
     expect(scoreEmoji(70)).toBe("🟨");
     expect(scoreEmoji(10)).toBe("🟥");
-    expect(dailyShareText("2026-01-03", [90, 70, 10, 100, 85])).toBe(
+    expect(dailyShareText("2026-10-04", [90, 70, 10, 100, 85])).toBe(
       "Rhythm Royale Daily #3\n🟩🟨🟥🟩🟩 355/500",
     );
   });

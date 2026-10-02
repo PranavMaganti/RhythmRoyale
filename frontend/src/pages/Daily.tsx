@@ -47,8 +47,14 @@ function recordStreak(key: string): Streak {
   return next;
 }
 
+/** Today's challenge. A page left open past midnight UTC moves on to the new day's. */
 export default function Daily() {
-  const key = useMemo(() => dailyKey(), []);
+  const [day, setDay] = useState(dailyKey);
+  const newDay = useCallback(() => setDay(dailyKey()), []);
+  return <DailyChallenge key={day} dayKey={day} onNewDay={newDay} />;
+}
+
+function DailyChallenge({ dayKey: key, onNewDay }: { dayKey: string; onNewDay: () => void }) {
   const rhythms = useMemo(() => dailyRhythms(key), [key]);
   const storageKey = `daily:${key}`;
   const [progress, setProgress] = useState<DailyProgress>(() =>
@@ -63,6 +69,16 @@ export default function Daily() {
   const [submitError, setSubmitError] = useState(false);
   const [copied, setCopied] = useState(false);
   const [showShareText, setShowShareText] = useState(false);
+
+  // Roll over at midnight UTC, but never in the middle of a melody.
+  const [expired, setExpired] = useState(false);
+  useEffect(() => {
+    const timer = setTimeout(() => setExpired(true), msUntilNextDaily() + 1000);
+    return () => clearTimeout(timer);
+  }, []);
+  useEffect(() => {
+    if (expired && stage !== "playing") onNewDay();
+  }, [expired, stage, onNewDay]);
 
   const done = progress.scores.length === ROUNDS;
   const current = progress.scores.length;
