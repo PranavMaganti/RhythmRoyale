@@ -71,6 +71,14 @@ input:focus-visible,
   padding-right: env(safe-area-inset-right, 0px);
 }
 
+/* The game screen fills #app: HUD, map, ticker, command bar. */
+.game {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
 /* ---------- HUD ---------- */
 .hud {
   display: flex;
@@ -667,6 +675,7 @@ input:focus-visible,
   overflow-x: auto;
 }
 
+/* biome-ignore lint/style/noDescendingSpecificity: a different component to .speed button */
 .tabs button {
   flex: 1;
   min-height: 42px;
@@ -759,7 +768,9 @@ input:focus-visible,
   font-size: 13px;
   line-height: 1.05;
   letter-spacing: 0.02em;
-  transition: background 0.15s, transform 0.15s;
+  transition:
+    background 0.15s,
+    transform 0.15s;
 }
 
 .hex.available {
@@ -924,6 +935,10 @@ input:focus-visible,
   background: #ffffff05;
 }
 
+.region-row .bar {
+  background: #ffffff14;
+}
+
 .region-row .nm {
   min-width: 0;
   overflow: hidden;
@@ -953,6 +968,7 @@ input:focus-visible,
   flex-wrap: wrap;
 }
 
+/* biome-ignore lint/style/noDescendingSpecificity: a different component to .tabs button */
 .sort button {
   padding: 6px 10px;
   border-radius: 8px;
@@ -965,6 +981,7 @@ input:focus-visible,
 .sort button[aria-pressed="true"] {
   color: var(--text);
   background: var(--panel-2);
+  border-color: color-mix(in srgb, var(--infect) 65%, var(--line));
 }
 
 /* Title & setup */
@@ -1133,7 +1150,9 @@ input:focus-visible,
   *,
   *::before,
   *::after {
+    /* biome-ignore lint/complexity/noImportantStyles: must beat every animation */
     animation: none !important;
+    /* biome-ignore lint/complexity/noImportantStyles: must beat every transition */
     transition: none !important;
   }
 }
